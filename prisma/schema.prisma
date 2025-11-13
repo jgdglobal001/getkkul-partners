@@ -1,0 +1,285 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model accounts {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  users             users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model addresses {
+  id              String  @id
+  zipCode         String
+  isDefault       Boolean @default(false)
+  userId          String
+  address         String
+  deliveryRequest String  @default("문 앞")
+  detailAddress   String
+  entranceCode    String?
+  phone           String
+  recipientName   String
+  users           users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model cart_items {
+  id                 String   @id
+  quantity           Int      @default(1)
+  productId          String
+  title              String
+  price              Float
+  image              String?
+  category           String?
+  brand              String?
+  discountPercentage Float?
+  userId             String
+  products           products @relation(fields: [productId], references: [id], onDelete: Cascade)
+  users              users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model categories {
+  id          String   @id
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  image       String?
+  icon        String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+}
+
+model order_items {
+  id                 String   @id
+  quantity           Int
+  productId          String
+  title              String
+  price              Float
+  total              Float
+  image              String?
+  category           String?
+  originalPrice      Float?
+  discountPercentage Float?
+  orderId            String
+  orders             orders   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  products           products @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model orders {
+  id                  String        @id
+  orderId             String        @unique
+  status              String        @default("pending")
+  paymentStatus       String        @default("pending")
+  paymentMethod       String        @default("online")
+  totalAmount         Float
+  currency            String        @default("KRW")
+  shippingAddress     Json
+  billingAddress      Json?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime
+  userId              String
+  lastTossAttempt     DateTime?
+  tossApprovalNumber  String?
+  tossCardCompany     String?
+  tossCardNumber      String?
+  tossFailureReason   String?
+  tossOrderId         String?
+  tossPaymentAttempts Int           @default(0)
+  tossPaymentId       String?
+  tossPaymentKey      String?       @unique
+  tossPaymentMethod   String?
+  tossReceipt         Json?
+  order_items         order_items[]
+  users               users         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model product_answers {
+  id                String            @id
+  questionId        String
+  userId            String
+  answer            String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime
+  product_questions product_questions @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  users             users             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model product_questions {
+  id              String            @id
+  productId       String
+  userId          String
+  question        String
+  isAnswered      Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  product_answers product_answers[]
+  products        products          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  users           users             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model products {
+  id                        String              @id
+  title                     String
+  description               String
+  price                     Float
+  discountPercentage        Float               @default(0)
+  rating                    Float               @default(0)
+  stock                     Int                 @default(0)
+  brand                     String?
+  category                  String
+  thumbnail                 String
+  images                    String[]
+  detailImages              String[]
+  tags                      String[]
+  sku                       String              @unique
+  weight                    Float?
+  dimensions                Json?
+  warrantyInformation       String?
+  shippingInformation       String?
+  returnPolicy              String?
+  minimumOrderQuantity      Int                 @default(1)
+  availabilityStatus        String              @default("In Stock")
+  meta                      Json?
+  isActive                  Boolean             @default(true)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime
+  asResponsible             String?
+  autoLimitations           String?
+  bundleShipping            String?
+  clothingLimitations       String?
+  color                     String?
+  detailedSpecs             String?
+  electronicsLimitations    String?
+  exchangeReturnCost        String?
+  exchangeReturnDeadline    String?
+  exchangeReturnLimitations String?
+  foodLimitations           String?
+  kcCertification           String?
+  madeInCountry             String?
+  manufacturer              String?
+  material                  String?
+  mediaLimitations          String?
+  modelNumber               String?
+  productComposition        String?
+  productName               String?
+  releaseDate               String?
+  sellerLegalNotice         String?
+  sellerName                String?
+  sellerPhone               String?
+  shippingCost              String?
+  shippingMethod            String?
+  shippingPeriod            String?
+  size                      String?
+  warrantyStandard          String?
+  cart_items                cart_items[]
+  order_items               order_items[]
+  product_questions         product_questions[]
+  wishlist_items            wishlist_items[]
+}
+
+model sessions {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model users {
+  id                    String                      @id @default(cuid())
+  name                  String?
+  email                 String                      @unique
+  password              String?
+  image                 String?
+  role                  String                      @default("user")
+  provider              String?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  firstName             String?
+  lastName              String?
+  phone                 String?
+  newsletter            Boolean                     @default(false)
+  notifications         Boolean                     @default(true)
+  emailVerified         DateTime?
+  accounts              accounts[]
+  addresses             addresses[]
+  cart_items            cart_items[]
+  orders                orders[]
+  product_answers       product_answers[]
+  product_questions     product_questions[]
+  sessions              sessions[]
+  wishlist_items        wishlist_items[]
+  business_registrations business_registrations?
+}
+
+model verification_tokens {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model wishlist_items {
+  id                 String   @id
+  productId          String
+  title              String
+  price              Float
+  image              String?
+  category           String?
+  brand              String?
+  discountPercentage Float?
+  userId             String
+  products           products @relation(fields: [productId], references: [id], onDelete: Cascade)
+  users              users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model business_registrations {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  businessType          String   // "법인" or "개인"
+  businessName          String
+  businessNumber        String   @unique
+  representativeName    String
+  businessCategory      String
+  businessType2         String
+  businessAddress       String
+  contactName           String
+  contactPhone          String
+  contactEmail          String
+  bankName              String
+  accountNumber         String
+  accountHolder         String
+  platformUrl           String?
+  mobileAppUrl          String?
+  businessRegistrationDoc String?  // 사업자 등록증 이미지 URL
+  bankbookDoc           String?   // 통장 사본 이미지 URL
+  step                  Int      @default(1)  // 현재 진행 단계 (1, 2, 3)
+  isCompleted           Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  users                 users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

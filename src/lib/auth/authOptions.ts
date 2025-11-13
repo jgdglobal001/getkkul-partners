@@ -1,0 +1,162 @@
+import { type NextAuthOptions } from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
+import Kakao from "./providers/kakao";
+import Naver from "./providers/naver";
+import { prisma } from "../prisma";
+import { findUserByEmail, createUser } from "../prisma/userService";
+
+export const authConfig: NextAuthOptions = {
+  trustHost: true,
+  adapter: undefined, // JWT 전략 사용 - Adapter 비활성화
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+          hl: "ko", // 한국어 설정
+        },
+      },
+    }),
+    Kakao({
+      clientId: process.env.KAKAO_CLIENT_ID!,
+      clientSecret: process.env.KAKAO_CLIENT_SECRET!,
+    }),
+    Naver({
+      clientId: process.env.NAVER_CLIENT_ID!,
+      clientSecret: process.env.NAVER_CLIENT_SECRET!,
+    }),
+  ],
+  pages: {
+    signIn: "/auth/signin",
+    error: "/auth/error",
+  },
+  debug: process.env.NODE_ENV === "development",
+  session: {
+    strategy: "jwt",
+  },
+  callbacks: {
+    async signIn({ user, account, profile }) {
+      // Handle OAuth providers (Google, Kakao, Naver)
+      if (account?.provider === "google" || account?.provider === "kakao" || account?.provider === "naver") {
+        try {
+          console.log(`[OAuth SignIn] Provider: ${account?.provider}`);
+          console.log(`[OAuth SignIn] User from profile:`, {
+            email: user.email,
+            name: user.name,
+            image: user.image?.substring(0, 50) + (user.image && user.image.length > 50 ? '...' : ''),
+          });
+
+          if (user.email) {
+            console.log(`[OAuth SignIn] Finding user by email: ${user.email}`);
+            let existingUser = await findUserByEmail(user.email);
+            console.log(`[OAuth SignIn] Existing user found:`, existingUser ? "YES" : "NO");
+
+            if (!existingUser) {
+              console.log(`[OAuth SignIn] Creating new user...`);
+              existingUser = await createUser({
+                name: user.name || "",
+                email: user.email,
+                image: user.image || "",
+                provider: account.provider,
+                emailVerified: true,
+              });
+              console.log(`[OAuth SignIn] User created successfully:`, existingUser?.id);
+            }
+
+            if (existingUser) {
+              user.id = existingUser.id;
+              console.log(`[OAuth SignIn] User ID set to:`, user.id);
+            }
+          } else {
+            const tempEmail = `${account.provider}_${account.providerAccountId}@oauth.local`;
+            console.log(`[OAuth SignIn] No email, using temp email: ${tempEmail}`);
+
+            let existingUser = await findUserByEmail(tempEmail);
+            console.log(`[OAuth SignIn] Existing user found:`, existingUser ? "YES" : "NO");
+
+            if (!existingUser) {
+              console.log(`[OAuth SignIn] Creating new user with temp email...`);
+              existingUser = await createUser({
+                name: user.name || `${account.provider} User`,
+                email: tempEmail,
+                image: user.image || "",
+                provider: account.provider,
+                emailVerified: false,
+              });
+              console.log(`[OAuth SignIn] User created successfully:`, existingUser?.id);
+            }
+
+            if (existingUser) {
+              user.id = existingUser.id;
+              user.email = tempEmail;
+              console.log(`[OAuth SignIn] User ID set to:`, user.id);
+            }
+          }
+          console.log(`[OAuth SignIn] SignIn callback completed successfully`);
+        } catch (error) {
+          console.error("Error handling OAuth user:", error);
+          console.error("Error stack:", (error as any)?.stack);
+          throw error;
+        }
+      }
+      return true;
+    },
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.id = user.id || token.sub || `user_${Date.now()}`;
+        token.role = "user";
+        token.email = user.email;
+        token.name = user.name;
+        if (user.image) {
+          token.picture = user.image;
+        }
+      }
+
+      if (!token.id) {
+        if (token.sub) {
+          token.id = token.sub;
+        } else if (token.email) {
+          token.id = `temp_${token.email.replace(/[^a-zA-Z0-9]/g, "_")}`;
+        }
+      }
+
+      if (!token.role) {
+        token.role = "user";
+      }
+
+      return token;
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.id = (token.id as string) || (token.sub as string);
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
+
+        try {
+          const user = await findUserByEmail(session.user.email!);
+          if (user) {
+            session.user.role = user.role || "user";
+            session.user.name = user.name || session.user.name;
+            session.user.image = user.image || (token.picture as string);
+          } else {
+            session.user.role = (token.role as string) || "user";
+          }
+        } catch (error) {
+          console.error("Error fetching user data from Prisma:", error);
+          session.user.role = (token.role as string) || "user";
+        }
+
+        if (token.picture && !session.user.image) {
+          session.user.image = token.picture as string;
+        }
+      }
+
+      return session;
+    },
+  },
+};
+
