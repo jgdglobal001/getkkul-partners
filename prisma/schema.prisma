@@ -86,6 +86,24 @@ model order_items {
   products           products @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
+model partner_links {
+  id              String   @id @default(cuid())
+  shortCode       String   @unique
+  partnerId       String
+  productId       String
+  clickCount      Int      @default(0)
+  conversionCount Int      @default(0)
+  revenue         Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  users           users    @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  products        products @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([shortCode])
+  @@index([partnerId])
+  @@index([productId])
+}
+
 model orders {
   id                  String        @id
   orderId             String        @unique
@@ -196,6 +214,7 @@ model products {
   order_items               order_items[]
   product_questions         product_questions[]
   wishlist_items            wishlist_items[]
+  partner_links             partner_links[]
 }
 
 model sessions {
@@ -231,6 +250,7 @@ model users {
   sessions              sessions[]
   wishlist_items        wishlist_items[]
   business_registrations business_registrations?
+  partner_links         partner_links[]
 }
 
 model verification_tokens {
