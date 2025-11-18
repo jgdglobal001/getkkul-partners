@@ -4,9 +4,10 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
-import SearchSection from '@/components/dashboard/SearchSection';
+import SimpleSearchBar from '@/components/dashboard/SimpleSearchBar';
 import PromotionBanner from '@/components/dashboard/PromotionBanner';
 import ReportSection from '@/components/dashboard/ReportSection';
+import Footer from '@/components/common/Footer';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -37,14 +38,14 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* 헤더 */}
       <DashboardHeader />
 
       {/* 메인 콘텐츠 */}
-      <main>
+      <main className="flex-1">
         {/* 상품검색 섹션 */}
-        <SearchSection />
+        <SimpleSearchBar />
 
         {/* 프로모션 배너 */}
         <PromotionBanner />
@@ -52,6 +53,9 @@ export default function DashboardPage() {
         {/* 리포트 섹션 */}
         <ReportSection />
       </main>
+
+      {/* 푸터 */}
+      <Footer />
     </div>
   );
 }

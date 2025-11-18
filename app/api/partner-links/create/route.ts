@@ -53,10 +53,18 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3003';
     const shortUrl = `${baseUrl}/p/${shortCode}`;
 
-    // HTML 코드 생성
+    // HTML 코드 생성 (2가지 버전)
+    // 일반태그 (iframe) - 보더라인 체크 시 (기본값)
     const iframeCode = `<iframe src="${baseUrl}/embed/${shortCode}" width="120" height="240" frameborder="0" scrolling="no" referrerpolicy="unsafe-url"></iframe>`;
-    
+
+    // 일반태그 (iframe) - 보더라인 해제 시
+    const iframeCodeNoBorder = `<iframe src="${baseUrl}/embed/${shortCode}?border=0" width="120" height="240" frameborder="0" scrolling="no" referrerpolicy="unsafe-url"></iframe>`;
+
+    // 블로그용 태그 (img) - 보더라인 체크 시 (테두리 없음)
     const imgCode = `<a href="${shortUrl}" target="_blank" referrerpolicy="unsafe-url"><img src="${product.thumbnail}" alt="${product.title}" width="120" height="240"></a>`;
+
+    // 블로그용 태그 (img) - 보더라인 해제 시 (테두리 있음)
+    const imgCodeWithBorder = `<a href="${shortUrl}" target="_blank" referrerpolicy="unsafe-url"><img src="${product.thumbnail}" alt="${product.title}" width="120" height="240" style="border: 1px solid #ddd;"></a>`;
 
     return NextResponse.json({
       success: true,
@@ -65,7 +73,9 @@ export async function POST(request: NextRequest) {
         shortCode: partnerLink.shortCode,
         shortUrl,
         iframeCode,
+        iframeCodeNoBorder,
         imgCode,
+        imgCodeWithBorder,
         product: {
           id: product.id,
           title: product.title,

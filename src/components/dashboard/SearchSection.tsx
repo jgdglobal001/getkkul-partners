@@ -71,7 +71,53 @@ export default function SearchSection() {
     <div className="bg-white py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* 제목 */}
-        <h1 className="text-3xl font-bold text-center mb-8">상품검색</h1>
+        <h1 className="text-3xl font-bold text-center mb-4">상품 링크</h1>
+
+        {/* 안내 문구 */}
+        <div className="text-center mb-6">
+          <p className="text-gray-700 mb-1">상품을 광고할 링크 혹은 배너를 생성할 수 있습니다.</p>
+          <p className="text-gray-600 text-sm">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pink-100 text-pink-600 text-xs font-bold mr-1">🔘</span>
+            을 클릭하여 생성해 보세요.
+          </p>
+        </div>
+
+        {/* 단계 안내 */}
+        <div className="max-w-2xl mx-auto mb-8">
+          <div className="flex items-center justify-center gap-4">
+            {/* 1단계 */}
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-lg mb-2">
+                ✓
+              </div>
+              <p className="text-sm font-medium text-gray-700">상품 탐색</p>
+            </div>
+
+            {/* 화살표 */}
+            <div className="text-gray-400 text-2xl">→</div>
+
+            {/* 2단계 */}
+            <div className="flex flex-col items-center">
+              <div className={`w-12 h-12 rounded-full ${products.length > 0 ? 'bg-blue-500' : 'bg-gray-300'} text-white flex items-center justify-center font-bold text-lg mb-2`}>
+                2
+              </div>
+              <p className={`text-sm font-medium ${products.length > 0 ? 'text-blue-600' : 'text-gray-500'}`}>
+                마음에 드는 상품 선택
+              </p>
+            </div>
+
+            {/* 화살표 */}
+            <div className="text-gray-400 text-2xl">→</div>
+
+            {/* 3단계 */}
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold text-lg mb-2">
+                3
+              </div>
+              <p className="text-sm font-medium text-gray-500">URL 혹은 배너 만들기</p>
+            </div>
+          </div>
+        </div>
 
         {/* 검색 영역 */}
         <div className="max-w-3xl mx-auto mb-8">
