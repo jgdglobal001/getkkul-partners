@@ -13,7 +13,7 @@ export default function CallbackPage() {
       if (status === 'loading') return;
 
       if (!session?.user?.id) {
-        router.push('/auth/signin');
+        router.push('/auth');
         return;
       }
 
@@ -23,7 +23,7 @@ export default function CallbackPage() {
         const result = await response.json();
 
         if (result.data && result.data.isCompleted) {
-          // 사업자 등록 정보가 있으면 대시보드로 이동
+          // 사업자 등록 완료 → 대시보드로 이동
           router.push('/dashboard');
         } else {
           // 사업자 등록 정보가 없으면 1단계로 이동

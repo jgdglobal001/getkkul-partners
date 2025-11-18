@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Header from '@/components/Header';
 
 export default function Home() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -12,28 +13,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <div className="flex justify-between items-center h-16">
-            <a href="/" className="flex items-center hover:opacity-80 transition">
-              <img
-                src="/겟꿀파트너스 로고(직원).png"
-                alt="겟꿀 파트너스 로고"
-                className="h-12 w-auto"
-              />
-            </a>
-            <nav className="hidden md:flex gap-8 text-sm">
-              <a href="#" className="text-gray-600 hover:text-indigo-600">파트너 정보</a>
-              <a href="#" className="text-gray-600 hover:text-indigo-600">도움말</a>
-              <a href="#" className="text-gray-600 hover:text-indigo-600">고객센터</a>
-            </nav>
-            <div className="flex gap-2 items-center">
-              <a href="/login" className="text-gray-600 hover:text-indigo-600 px-4 py-2 text-sm font-medium">로그인</a>
-              <a href="/signup" className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium whitespace-nowrap">회원가입</a>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* 히어로 섹션 */}
       <section className="bg-linear-to-r from-indigo-50 to-blue-50 py-20">
@@ -50,10 +30,10 @@ export default function Home() {
               </p>
               <div className="flex gap-4">
                 <a
-                  href="/signup"
+                  href="/auth"
                   className="bg-indigo-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-indigo-700 hover:shadow-lg transition text-lg transform hover:scale-105"
                 >
-                  파트너가입
+                  시작하기
                 </a>
                 <a
                   href="/company-intro"
@@ -145,10 +125,10 @@ export default function Home() {
                 한정된 기간이니 지금 바로 신청하세요.
               </p>
               <a
-                href="/signup"
+                href="/auth"
                 className="inline-block bg-white text-indigo-600 px-8 py-3 rounded-lg font-bold hover:bg-blue-50 transition transform hover:scale-105 hover:shadow-lg"
               >
-                지금 가입하기
+                지금 시작하기
               </a>
             </div>
             <div className={`rounded-2xl overflow-hidden shadow-2xl ${isLoaded ? 'animate-slide-in-right' : 'opacity-0'}`}>

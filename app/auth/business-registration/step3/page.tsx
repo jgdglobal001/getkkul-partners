@@ -72,6 +72,10 @@ export default function Step3Page() {
       const agreements = JSON.parse(sessionStorage.getItem('agreements') || '{}');
       const step2Data = JSON.parse(sessionStorage.getItem('step2Data') || '{}');
 
+      // 배열을 쉼표로 구분된 문자열로 변환
+      const platformUrl = platformUrls.join(', ');
+      const mobileAppUrl = mobileAppUrls.join(', ');
+
       // API에 데이터 전송
       const response = await fetch('/api/business-registration', {
         method: 'POST',
@@ -81,14 +85,16 @@ export default function Step3Page() {
         body: JSON.stringify({
           businessType,
           ...step2Data,
-          platformUrls,
-          mobileAppUrls,
+          platformUrl,
+          mobileAppUrl,
           agreements,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('사업자 등록 정보 저장 실패');
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || '사업자 등록 정보 저장 실패');
       }
 
       // 사업자명을 sessionStorage에 저장 (완료 페이지에서 사용)
