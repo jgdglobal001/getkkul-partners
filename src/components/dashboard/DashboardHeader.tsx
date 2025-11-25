@@ -3,12 +3,14 @@
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FaBell } from 'react-icons/fa';
 
 export default function DashboardHeader() {
   const { data: session } = useSession();
   const [partnershipId, setPartnershipId] = useState('');
+  const [isHelpDropdownOpen, setIsHelpDropdownOpen] = useState(false);
+  const helpDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // 파트너십 ID 가져오기
@@ -28,6 +30,18 @@ export default function DashboardHeader() {
       fetchPartnershipId();
     }
   }, [session]);
+
+  // 드롭다운 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (helpDropdownRef.current && !helpDropdownRef.current.contains(event.target as Node)) {
+        setIsHelpDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -61,9 +75,52 @@ export default function DashboardHeader() {
             <Link href="/dashboard/terms" className="text-gray-600 hover:text-blue-600">
               약관 및 정책
             </Link>
-            <Link href="/dashboard/help" className="text-gray-600 hover:text-blue-600">
-              도움말
-            </Link>
+
+            {/* 도움말 드롭다운 */}
+            <div className="relative" ref={helpDropdownRef}>
+              <button
+                onClick={() => setIsHelpDropdownOpen(!isHelpDropdownOpen)}
+                className="text-gray-600 hover:text-blue-600 flex items-center gap-1"
+              >
+                도움말
+                <svg
+                  className={`w-4 h-4 transition-transform ${isHelpDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* 드롭다운 메뉴 */}
+              {isHelpDropdownOpen && (
+                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                  <Link
+                    href="/dashboard/support"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setIsHelpDropdownOpen(false)}
+                  >
+                    도움말 센터
+                  </Link>
+                  <Link
+                    href="/dashboard/support/faq"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setIsHelpDropdownOpen(false)}
+                  >
+                    자주 묻는 질문
+                  </Link>
+                  <Link
+                    href="/dashboard/support/contact"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setIsHelpDropdownOpen(false)}
+                  >
+                    1:1 문의하기
+                  </Link>
+                </div>
+              )}
+            </div>
+
             <Link href="/dashboard/notices" className="text-gray-600 hover:text-blue-600">
               공지사항
             </Link>

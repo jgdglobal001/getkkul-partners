@@ -15,8 +15,8 @@ export default function SimpleSearchBar() {
       return;
     }
 
-    // /products/search 페이지로 이동
-    router.push(`/products/search?q=${encodeURIComponent(searchQuery)}`);
+    // /dashboard/link-generator 페이지로 이동
+    router.push(`/dashboard/link-generator?q=${encodeURIComponent(searchQuery)}`);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
