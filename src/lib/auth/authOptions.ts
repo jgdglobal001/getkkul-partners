@@ -2,11 +2,11 @@ import { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import Kakao from "./providers/kakao";
 import Naver from "./providers/naver";
-import { prisma } from "../prisma";
-import { findUserByEmail, createUser } from "../prisma/userService";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export const authConfig: NextAuthOptions = {
-  trustHost: true,
   adapter: undefined, // JWT 전략 사용 - Adapter 비활성화
   providers: [
     GoogleProvider({
@@ -52,18 +52,20 @@ export const authConfig: NextAuthOptions = {
 
           if (user.email) {
             console.log(`[OAuth SignIn] Finding user by email: ${user.email}`);
-            let existingUser = await findUserByEmail(user.email);
+            const existingUsers = await db.select().from(users).where(eq(users.email, user.email)).limit(1);
+            let existingUser = existingUsers[0];
             console.log(`[OAuth SignIn] Existing user found:`, existingUser ? "YES" : "NO");
 
             if (!existingUser) {
               console.log(`[OAuth SignIn] Creating new user...`);
-              existingUser = await createUser({
+              const newUsers = await db.insert(users).values({
                 name: user.name || "",
                 email: user.email,
                 image: user.image || "",
                 provider: account.provider,
-                emailVerified: true,
-              });
+                emailVerified: new Date(),
+              }).returning();
+              existingUser = newUsers[0];
               console.log(`[OAuth SignIn] User created successfully:`, existingUser?.id);
             }
 
@@ -75,18 +77,20 @@ export const authConfig: NextAuthOptions = {
             const tempEmail = `${account.provider}_${account.providerAccountId}@oauth.local`;
             console.log(`[OAuth SignIn] No email, using temp email: ${tempEmail}`);
 
-            let existingUser = await findUserByEmail(tempEmail);
+            const existingUsers = await db.select().from(users).where(eq(users.email, tempEmail)).limit(1);
+            let existingUser = existingUsers[0];
             console.log(`[OAuth SignIn] Existing user found:`, existingUser ? "YES" : "NO");
 
             if (!existingUser) {
               console.log(`[OAuth SignIn] Creating new user with temp email...`);
-              existingUser = await createUser({
+              const newUsers = await db.insert(users).values({
                 name: user.name || `${account.provider} User`,
                 email: tempEmail,
                 image: user.image || "",
                 provider: account.provider,
-                emailVerified: false,
-              });
+                emailVerified: null,
+              }).returning();
+              existingUser = newUsers[0];
               console.log(`[OAuth SignIn] User created successfully:`, existingUser?.id);
             }
 
@@ -137,7 +141,8 @@ export const authConfig: NextAuthOptions = {
         session.user.name = token.name as string;
 
         try {
-          const user = await findUserByEmail(session.user.email!);
+          const userResults = await db.select().from(users).where(eq(users.email, session.user.email!)).limit(1);
+          const user = userResults[0];
           if (user) {
             session.user.role = user.role || "user";
             session.user.name = user.name || session.user.name;
@@ -146,7 +151,7 @@ export const authConfig: NextAuthOptions = {
             session.user.role = (token.role as string) || "user";
           }
         } catch (error) {
-          console.error("Error fetching user data from Prisma:", error);
+          console.error("Error fetching user data from database:", error);
           session.user.role = (token.role as string) || "user";
         }
 

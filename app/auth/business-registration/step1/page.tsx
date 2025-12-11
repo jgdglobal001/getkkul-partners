@@ -23,7 +23,7 @@ export default function Step1Page() {
     }
   }, [session, router]);
 
-  const handleAgreementChange = (key: string) => {
+  const handleAgreementChange = (key: keyof typeof agreements) => {
     setAgreements(prev => ({
       ...prev,
       [key]: !prev[key]

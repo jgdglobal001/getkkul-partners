@@ -150,6 +150,23 @@ export default function NewNoticePage() {
               </label>
             </div>
 
+            {/* 제목 */}
+            <div className="mb-6">
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                제목 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="title"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                placeholder="공지사항 제목을 입력하세요"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+
             {/* 내용 */}
             <div className="mb-6">
               <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
@@ -209,21 +226,3 @@ export default function NewNoticePage() {
     </div>
   );
 }
-
-            {/* 제목 */}
-            <div className="mb-6">
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                제목 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="title"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                placeholder="공지사항 제목을 입력하세요"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
-

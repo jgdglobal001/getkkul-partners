@@ -1,6 +1,8 @@
 import { getServerSession } from 'next-auth';
 import { authConfig } from '@/lib/auth/authOptions';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { businessRegistrations } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -82,13 +84,19 @@ export async function POST(request: NextRequest) {
     console.log('[API] businessNumber:', fullBusinessNumber);
 
     // 기존 등록 정보 확인 (userId 또는 businessNumber로)
-    const existingByUserId = await prisma.business_registrations.findUnique({
-      where: { userId: session.user.id },
-    });
+    const existingByUserIdResults = await db
+      .select()
+      .from(businessRegistrations)
+      .where(eq(businessRegistrations.userId, session.user.id))
+      .limit(1);
+    const existingByUserId = existingByUserIdResults[0];
 
-    const existingByBusinessNumber = await prisma.business_registrations.findUnique({
-      where: { businessNumber: fullBusinessNumber },
-    });
+    const existingByBusinessNumberResults = await db
+      .select()
+      .from(businessRegistrations)
+      .where(eq(businessRegistrations.businessNumber, fullBusinessNumber))
+      .limit(1);
+    const existingByBusinessNumber = existingByBusinessNumberResults[0];
 
     let businessRegistration;
 
@@ -104,9 +112,9 @@ export async function POST(request: NextRequest) {
     if (existingByUserId) {
       // 이미 등록된 경우 업데이트
       console.log('[API] 기존 등록 정보 업데이트...');
-      businessRegistration = await prisma.business_registrations.update({
-        where: { userId: session.user.id },
-        data: {
+      const updated = await db
+        .update(businessRegistrations)
+        .set({
           businessType: businessType || '법인',
           businessName,
           businessNumber: fullBusinessNumber,
@@ -124,13 +132,16 @@ export async function POST(request: NextRequest) {
           mobileAppUrl: mobileAppUrl || null,
           step: 3,
           isCompleted: true,
-        },
-      });
+        })
+        .where(eq(businessRegistrations.userId, session.user.id))
+        .returning();
+      businessRegistration = updated[0];
     } else {
       // 새로 등록
       console.log('[API] 새로운 등록 정보 생성...');
-      businessRegistration = await prisma.business_registrations.create({
-        data: {
+      const created = await db
+        .insert(businessRegistrations)
+        .values({
           userId: session.user.id,
           businessType: businessType || '법인',
           businessName,
@@ -149,8 +160,9 @@ export async function POST(request: NextRequest) {
           mobileAppUrl: mobileAppUrl || null,
           step: 3,
           isCompleted: true,
-        },
-      });
+        })
+        .returning();
+      businessRegistration = created[0];
     }
 
     console.log('[API] 저장 성공:', businessRegistration.id);
@@ -185,7 +197,7 @@ export async function GET(request: NextRequest) {
   try {
     // 세션 확인
     const session = await getServerSession(authConfig);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: '인증되지 않은 사용자입니다.' },
@@ -194,9 +206,12 @@ export async function GET(request: NextRequest) {
     }
 
     // 사용자의 사업자 등록 정보 조회
-    const businessRegistration = await prisma.business_registrations.findUnique({
-      where: { userId: session.user.id },
-    });
+    const results = await db
+      .select()
+      .from(businessRegistrations)
+      .where(eq(businessRegistrations.userId, session.user.id))
+      .limit(1);
+    const businessRegistration = results[0];
 
     if (!businessRegistration) {
       return NextResponse.json(

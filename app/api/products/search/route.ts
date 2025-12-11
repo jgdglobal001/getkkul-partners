@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { products as productsTable } from '@/db/schema';
+import { eq, or, ilike, sql } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,24 +17,35 @@ export async function GET(request: NextRequest) {
     }
 
     // 데이터베이스에서 상품 검색 (랜덤 정렬)
-    // title, description, brand, category, tags에서 검색
-    // 검색 결과를 랜덤으로 정렬하여 500개 제한
-    const products = await prisma.$queryRaw<any[]>`
-      SELECT
-        id, title, description, price, "discountPercentage", rating, stock,
-        brand, category, thumbnail, images, tags, sku, "availabilityStatus"
-      FROM products
-      WHERE "isActive" = true
-      AND (
-        title ILIKE ${`%${query}%`} OR
-        description ILIKE ${`%${query}%`} OR
-        brand ILIKE ${`%${query}%`} OR
-        category ILIKE ${`%${query}%`} OR
-        ${query} = ANY(tags)
+    const products = await db
+      .select({
+        id: productsTable.id,
+        title: productsTable.title,
+        description: productsTable.description,
+        price: productsTable.price,
+        discountPercentage: productsTable.discountPercentage,
+        rating: productsTable.rating,
+        stock: productsTable.stock,
+        brand: productsTable.brand,
+        category: productsTable.category,
+        thumbnail: productsTable.thumbnail,
+        images: productsTable.images,
+        tags: productsTable.tags,
+        sku: productsTable.sku,
+        availabilityStatus: productsTable.availabilityStatus,
+      })
+      .from(productsTable)
+      .where(
+        sql`${productsTable.isActive} = true AND (
+          ${productsTable.title} ILIKE ${`%${query}%`} OR
+          ${productsTable.description} ILIKE ${`%${query}%`} OR
+          ${productsTable.brand} ILIKE ${`%${query}%`} OR
+          ${productsTable.category} ILIKE ${`%${query}%`} OR
+          ${query} = ANY(${productsTable.tags})
+        )`
       )
-      ORDER BY RANDOM()
-      LIMIT ${limit}
-    `;
+      .orderBy(sql`RANDOM()`)
+      .limit(limit);
 
     // 응답 데이터 포맷팅
     const formattedProducts = products.map((product) => ({

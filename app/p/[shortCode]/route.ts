@@ -1,32 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { partnerLinks, products } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+import { sql } from 'drizzle-orm';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { shortCode: string } }
+  { params }: { params: Promise<{ shortCode: string }> }
 ) {
   try {
-    const { shortCode } = params;
+    const { shortCode } = await params;
 
     // DB에서 링크 조회
-    const link = await prisma.partner_links.findUnique({
-      where: { shortCode },
-      include: { products: true },
-    });
+    const links = await db
+      .select()
+      .from(partnerLinks)
+      .where(eq(partnerLinks.shortCode, shortCode))
+      .limit(1);
+
+    const link = links[0];
 
     if (!link) {
       return NextResponse.redirect(new URL('/404', request.url));
     }
 
     // 클릭 수 증가
-    await prisma.partner_links.update({
-      where: { shortCode },
-      data: { clickCount: { increment: 1 } },
-    });
+    await db
+      .update(partnerLinks)
+      .set({ clickCount: sql`${partnerLinks.clickCount} + 1` })
+      .where(eq(partnerLinks.shortCode, shortCode));
 
     // 쿠키에 파트너 ID 저장 (추적용, 30일 유효)
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     cookieStore.set('partner_ref', link.partnerId, {
       maxAge: 60 * 60 * 24 * 30, // 30일
       httpOnly: true,

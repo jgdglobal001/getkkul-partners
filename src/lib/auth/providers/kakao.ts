@@ -1,4 +1,4 @@
-import { OAuthConfig, OAuthUserConfig } from "next-auth/providers";
+import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers/oauth";
 
 export interface KakaoProfile {
   id: number;
@@ -42,8 +42,8 @@ export default function Kakao<P extends KakaoProfile>(
     token: "https://kauth.kakao.com/oauth/token",
     userinfo: {
       url: "https://kapi.kakao.com/v2/user/me",
-      async request({ tokens, provider }) {
-        const response = await fetch(provider.userinfo?.url as string, {
+      async request({ tokens }) {
+        const response = await fetch("https://kapi.kakao.com/v2/user/me", {
           headers: {
             Authorization: `Bearer ${tokens.access_token}`,
             "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",

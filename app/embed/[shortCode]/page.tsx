@@ -1,4 +1,6 @@
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { partnerLinks, products } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 
 interface EmbedPageProps {
@@ -11,16 +13,19 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
   const { shortCode } = params;
 
   // DB에서 링크 조회
-  const link = await prisma.partner_links.findUnique({
-    where: { shortCode },
-    include: { products: true },
-  });
+  const links = await db
+    .select()
+    .from(partnerLinks)
+    .leftJoin(products, eq(partnerLinks.productId, products.id))
+    .where(eq(partnerLinks.shortCode, shortCode))
+    .limit(1);
 
-  if (!link) {
+  if (!links[0] || !links[0].products) {
     notFound();
   }
 
-  const product = link.products;
+  const link = links[0].partner_links;
+  const product = links[0].products;
 
   // 파트너 링크 URL
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3003';
