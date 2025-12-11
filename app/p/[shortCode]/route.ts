@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 import { sql } from 'drizzle-orm';
 
+export const runtime = 'edge';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ shortCode: string }> }

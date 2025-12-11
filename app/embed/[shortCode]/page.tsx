@@ -3,6 +3,8 @@ import { partnerLinks, products } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 
+export const runtime = 'edge';
+
 interface EmbedPageProps {
   params: {
     shortCode: string;

@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authConfig } from '@/lib/auth/authOptions';
+import { getEdgeSession } from '@/lib/auth/edge-auth';
 import { db } from '@/db';
 import { products, partnerLinks } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
+export const runtime = 'edge';
+
 export async function POST(request: NextRequest) {
   try {
     // 인증 확인
-    const session = await getServerSession(authConfig);
+    const session = await getEdgeSession();
 
     if (!session || !session.user) {
       return NextResponse.json(

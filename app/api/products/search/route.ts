@@ -3,6 +3,8 @@ import { db } from '@/db';
 import { products as productsTable } from '@/db/schema';
 import { eq, or, ilike, sql } from 'drizzle-orm';
 
+export const runtime = 'edge';
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

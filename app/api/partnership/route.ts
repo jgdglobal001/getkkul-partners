@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authConfig } from '@/lib/auth/authOptions';
+import { getEdgeSession } from '@/lib/auth/edge-auth';
 import { db } from '@/db';
 import { businessRegistrations } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+
+export const runtime = 'edge';
 
 // 파트너십 ID 생성 함수
 function generatePartnershipId(): string {
@@ -16,7 +17,7 @@ function generatePartnershipId(): string {
 export async function GET(request: NextRequest) {
   try {
     // 세션 확인
-    const session = await getServerSession(authConfig);
+    const session = await getEdgeSession();
 
     if (!session?.user?.id) {
       return NextResponse.json(
