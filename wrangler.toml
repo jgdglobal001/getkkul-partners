@@ -1,5 +1,5 @@
 name = "getkkul-partners"
 compatibility_date = "2024-12-11"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat_v2", "streams_enable_constructors"]
 pages_build_output_dir = ".vercel/output/static"
 
