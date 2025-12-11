@@ -1,4 +1,4 @@
-import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers/oauth";
+import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers";
 
 export interface NaverProfile {
   resultcode: string;
@@ -34,7 +34,7 @@ export default function Naver<P extends NaverProfile>(
     token: "https://nid.naver.com/oauth2.0/token",
     userinfo: {
       url: "https://openapi.naver.com/v1/nid/me",
-      async request({ tokens }) {
+      async request({ tokens }: { tokens: { access_token?: string } }) {
         const response = await fetch("https://openapi.naver.com/v1/nid/me", {
           headers: {
             Authorization: `Bearer ${tokens.access_token}`,
@@ -51,14 +51,6 @@ export default function Naver<P extends NaverProfile>(
         email: profile.response.email || null,
         image: profile.response.profile_image || null,
       };
-    },
-    style: {
-      logo: "/naver-logo.svg",
-      logoDark: "/naver-logo.svg",
-      bg: "#03C75A",
-      text: "#FFFFFF",
-      bgDark: "#03C75A",
-      textDark: "#FFFFFF",
     },
     options,
   };
