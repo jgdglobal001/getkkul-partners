@@ -61,7 +61,7 @@ export default function Header() {
           {/* 로고 */}
           <a href="/" className="flex items-center hover:opacity-80 transition">
             <img
-              src="/겟꿀파트너스 로고(직원).png"
+              src="/getkkul-partners-logo.png"
               alt="겟꿀 파트너스 로고"
               className="h-12 w-auto"
             />

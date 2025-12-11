@@ -133,7 +133,7 @@ export default function Home() {
             </div>
             <div className={`rounded-2xl overflow-hidden shadow-2xl ${isLoaded ? 'animate-slide-in-right' : 'opacity-0'}`}>
               <img
-                src="/회원가입 이미지.jpg"
+                src="/signup-image.jpg"
                 alt="신규 파트너 가입 이벤트"
                 className="w-full h-auto object-cover rounded-2xl"
               />
@@ -298,7 +298,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div>
               <img
-                src="/겟꿀파트너스 로고(직원).png"
+                src="/getkkul-partners-logo.png"
                 alt="겟꿀 파트너스 로고"
                 className="h-12 w-auto mb-4"
               />

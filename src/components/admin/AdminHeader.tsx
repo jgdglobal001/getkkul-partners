@@ -15,7 +15,7 @@ export default function AdminHeader() {
           {/* 로고 */}
           <Link href="/admin" className="flex items-center">
             <Image
-              src="/겟꿀파트너스 로고(직원).png"
+              src="/getkkul-partners-logo.png"
               alt="겟꿀 파트너스 관리자"
               width={160}
               height={40}

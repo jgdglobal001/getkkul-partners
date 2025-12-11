@@ -122,7 +122,7 @@ export default function Step3Page() {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Link href="/">
             <Image
-              src="/겟꿀파트너스 로고(직원).png"
+              src="/getkkul-partners-logo.png"
               alt="겟꿀 파트너스"
               width={224}
               height={56}
