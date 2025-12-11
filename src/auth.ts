@@ -138,46 +138,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      console.log('[Session Callback] Starting session callback');
-      console.log('[Session Callback] Token:', { id: token.id, email: token.email, role: token.role });
-
+      // session 콜백에서는 DB 조회를 하지 않고 JWT 토큰 데이터만 사용
+      // DB 조회는 signIn 콜백에서만 수행하고, 결과를 JWT에 저장
       if (token && session.user) {
         session.user.id = (token.id as string) || (token.sub as string);
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        session.user.role = (token.role as string) || "user";
 
-        try {
-          console.log('[Session Callback] Fetching user from database...');
-          console.log('[Session Callback] Database URL exists:', !!process.env.DATABASE_URL);
-
-          const userResults = await db.select().from(users).where(eq(users.email, session.user.email!)).limit(1);
-          const user = userResults[0];
-
-          console.log('[Session Callback] User found in DB:', !!user);
-
-          if (user) {
-            session.user.role = user.role || "user";
-            session.user.name = user.name || session.user.name;
-            session.user.image = user.image || (token.picture as string);
-          } else {
-            session.user.role = (token.role as string) || "user";
-          }
-        } catch (error) {
-          console.error("[Session Callback] Error fetching user data from database:", error);
-          console.error("[Session Callback] Error details:", {
-            message: (error as any)?.message,
-            stack: (error as any)?.stack,
-            name: (error as any)?.name,
-          });
-          session.user.role = (token.role as string) || "user";
-        }
-
-        if (token.picture && !session.user.image) {
+        if (token.picture) {
           session.user.image = token.picture as string;
         }
       }
 
-      console.log('[Session Callback] Session callback completed');
       return session;
     },
   },
