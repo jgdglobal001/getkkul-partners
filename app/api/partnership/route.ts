@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authConfig } from '@/lib/auth/authOptions';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { businessRegistrations } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 // 파트너십 ID 생성 함수
 function generatePartnershipId(): string {
@@ -15,7 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     // 세션 확인
     const session = await getServerSession(authConfig);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: '인증되지 않은 사용자입니다.' },
@@ -24,9 +26,12 @@ export async function GET(request: NextRequest) {
     }
 
     // 사업자 등록 정보에서 파트너십 ID 조회
-    const businessRegistration = await prisma.business_registrations.findUnique({
-      where: { userId: session.user.id },
-    });
+    const results = await db
+      .select()
+      .from(businessRegistrations)
+      .where(eq(businessRegistrations.userId, session.user.id))
+      .limit(1);
+    const businessRegistration = results[0];
 
     if (!businessRegistration) {
       return NextResponse.json(
@@ -37,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     // 파트너십 ID가 없으면 생성
     let partnershipId = businessRegistration.businessNumber; // 임시로 사업자번호 사용
-    
+
     // 사업자번호를 파트너십 ID 형식으로 변환 (예: 123-45-67890 -> AF1234567)
     if (partnershipId) {
       const cleanNumber = partnershipId.replace(/-/g, '');

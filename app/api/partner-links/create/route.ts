@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authConfig } from '@/lib/auth/authOptions';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { products, partnerLinks } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
 export async function POST(request: NextRequest) {
   try {
     // 인증 확인
     const session = await getServerSession(authConfig);
-    
+
     if (!session || !session.user) {
       return NextResponse.json(
         { error: '로그인이 필요합니다.' },
@@ -26,9 +28,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 상품 존재 확인
-    const product = await prisma.products.findUnique({
-      where: { id: productId },
-    });
+    const productResults = await db
+      .select()
+      .from(products)
+      .where(eq(products.id, productId))
+      .limit(1);
+    const product = productResults[0];
 
     if (!product) {
       return NextResponse.json(
@@ -41,13 +46,15 @@ export async function POST(request: NextRequest) {
     const shortCode = nanoid(6);
 
     // DB에 파트너 링크 저장
-    const partnerLink = await prisma.partner_links.create({
-      data: {
+    const partnerLinkResults = await db
+      .insert(partnerLinks)
+      .values({
         shortCode,
         partnerId: session.user.id,
         productId,
-      },
-    });
+      })
+      .returning();
+    const partnerLink = partnerLinkResults[0];
 
     // 단축 URL 생성
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3003';
