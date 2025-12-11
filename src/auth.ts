@@ -7,6 +7,10 @@ import Kakao from "@/lib/auth/providers/kakao";
 import Naver from "@/lib/auth/providers/naver";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Cloudflare Pages에서 호스트 신뢰 설정 필요
+  trustHost: true,
+  // NextAuth v5는 AUTH_SECRET을 사용하지만, NEXTAUTH_SECRET도 호환됨
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
