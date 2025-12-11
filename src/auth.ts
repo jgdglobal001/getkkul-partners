@@ -37,7 +37,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/auth/signin",
     error: "/auth/error",
   },
-  debug: process.env.NODE_ENV === "development",
+  // 프로덕션에서도 디버그 모드 활성화 (임시)
+  debug: true,
   session: {
     strategy: "jwt",
   },
@@ -137,14 +138,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
+      console.log('[Session Callback] Starting session callback');
+      console.log('[Session Callback] Token:', { id: token.id, email: token.email, role: token.role });
+
       if (token && session.user) {
         session.user.id = (token.id as string) || (token.sub as string);
         session.user.email = token.email as string;
         session.user.name = token.name as string;
 
         try {
+          console.log('[Session Callback] Fetching user from database...');
+          console.log('[Session Callback] Database URL exists:', !!process.env.DATABASE_URL);
+
           const userResults = await db.select().from(users).where(eq(users.email, session.user.email!)).limit(1);
           const user = userResults[0];
+
+          console.log('[Session Callback] User found in DB:', !!user);
+
           if (user) {
             session.user.role = user.role || "user";
             session.user.name = user.name || session.user.name;
@@ -153,7 +163,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             session.user.role = (token.role as string) || "user";
           }
         } catch (error) {
-          console.error("Error fetching user data from database:", error);
+          console.error("[Session Callback] Error fetching user data from database:", error);
+          console.error("[Session Callback] Error details:", {
+            message: (error as any)?.message,
+            stack: (error as any)?.stack,
+            name: (error as any)?.name,
+          });
           session.user.role = (token.role as string) || "user";
         }
 
@@ -162,6 +177,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
+      console.log('[Session Callback] Session callback completed');
       return session;
     },
   },
