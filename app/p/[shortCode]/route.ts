@@ -36,14 +36,15 @@ export async function GET(
     // 쿠키에 파트너 ID 저장 (추적용, 30일 유효)
     const cookieStore = await cookies();
     cookieStore.set('partner_ref', link.partnerId, {
-      maxAge: 60 * 60 * 24 * 30, // 30일
+      maxAge: 60 * 60 * 24, // 24시간 (쿠팡과 동일한 기준 적용)
       httpOnly: true,
       sameSite: 'lax',
     });
 
-    // 겟꿀 쇼핑 상품 페이지로 리다이렉트
+    // 겟꿀 쇼핑 상품 페이지로 리다이렉트 (쿼리 파라미터로 파트너 정보 전달)
     const shoppingUrl = process.env.NEXT_PUBLIC_GETKKUL_SHOPPING_URL || 'http://localhost:3002';
-    const redirectUrl = `${shoppingUrl}/products/${link.productId}`;
+    // 파트너스 도메인의 쿠키는 쇼핑 도메인에서 읽을 수 없으므로, URL 파라미터로 전달해야 합니다.
+    const redirectUrl = `${shoppingUrl}/products/${link.productId}?partner_ref=${link.partnerId}&link_id=${link.id}`;
 
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
