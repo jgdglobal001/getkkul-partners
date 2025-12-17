@@ -135,7 +135,12 @@ export async function POST(request: NextRequest) {
       const encryptedBody = await new jose.CompactEncrypt(
         new TextEncoder().encode(JSON.stringify(payload))
       )
-        .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
+        .setProtectedHeader({
+          alg: 'dir',
+          enc: 'A256GCM',
+          iat: new Date().toISOString(), // Toss specific requirement (ISO string)
+          nonce: crypto.randomUUID().replace(/-/g, '')
+        })
         .encrypt(key);
 
       const basicAuth = btoa(secretKey + ':');
