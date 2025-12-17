@@ -97,7 +97,10 @@ export default function Step3Page() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('API Error:', errorData);
-        throw new Error(errorData.error || '사업자 등록 정보 저장 실패');
+        // Throw an error object that includes the details
+        const err = new Error(errorData.error || '사업자 등록 정보 저장 실패');
+        (err as any).details = errorData.details;
+        throw err;
       }
 
       // 사업자명을 sessionStorage에 저장 (완료 페이지에서 사용)
@@ -115,7 +118,13 @@ export default function Step3Page() {
     } catch (error: any) {
       console.error('Error:', error);
       let msg = error.message || '사업자 등록 정보 저장 중 오류가 발생했습니다.';
-      if (msg.includes('Status: 500')) {
+
+      if (error.details) {
+        msg += `\n\n[디버그 정보]\nToss Status: ${error.details.tossStatus}\nMessage: ${error.details.tossMessage}`;
+        if (error.details.sentPayload) {
+          msg += `\n\nPayload:\n${JSON.stringify(error.details.sentPayload, null, 2)}`;
+        }
+      } else if (msg.includes('Status: 500')) {
         msg += '\n\n[팁] 은행, 계좌번호, 예금주명이 정확한지 확인해주세요.\n(특히 예금주명이 은행 앱에서 잘려서 표시되는지 확인해보세요!)';
       }
       alert(msg);
