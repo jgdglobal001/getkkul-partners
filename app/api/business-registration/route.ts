@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
           } catch (e) { }
 
           return NextResponse.json(
-            { error: `토스 파트너 등록 실패: ${errorText}` },
+            { error: `토스 파트너 등록 실패 [Status: ${tossResponse.status}]: ${errorText}` },
             { status: 400 }
           );
         }
