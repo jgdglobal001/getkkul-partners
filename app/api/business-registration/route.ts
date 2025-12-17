@@ -42,15 +42,29 @@ export async function POST(request: NextRequest) {
     // 1. JWT 토큰을 직접 검증 (가벼운 방식, Edge 호환)
     const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
     if (!secret) {
-      console.error('[API] AUTH_SECRET is missing!');
+      console.error('[API] CRITICAL: AUTH_SECRET/NEXTAUTH_SECRET is missing in environment variables!');
+    } else {
+      console.log('[API] AUTH_SECRET is present (length: ' + secret.length + ')');
     }
 
-    const token = await getToken({ req: request, secret: secret, salt: secret ? undefined : 'authjs.session-token' });
-    // Note: getToken usually finds the secret automatically if env var is set.
+    // Inspect Cookies explicitly
+    const cookieHeader = request.headers.get('cookie') || '';
+    const cookies = cookieHeader.split(';').map(c => c.trim().split('=')[0]);
+    console.log('[API] Cookies in Request:', cookies);
+
+    // Call getToken with secureCookie explicit setting if needed. 
+    // Usually strict secure cookies are used in prod.
+    const token = await getToken({
+      req: request,
+      secret: secret,
+      secureCookie: process.env.NODE_ENV === 'production'
+    });
+
+    console.log('[API] getToken result:', token ? 'Token Found' : 'Token is NULL');
 
     if (!token?.sub) {
       console.log('[API] Token verification failed or no token found.');
-      console.log('[API] Headers:', JSON.stringify(Object.fromEntries(request.headers.entries())));
+      console.log('[API] Full Headers:', JSON.stringify(Object.fromEntries(request.headers.entries())));
       return NextResponse.json({ error: '인증되지 않은 사용자입니다. (No Token)' }, { status: 401 });
     }
 
