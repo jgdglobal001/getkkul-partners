@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
         .setProtectedHeader({
           alg: 'dir',
           enc: 'A256GCM',
-          iat: new Date().toISOString(), // Toss specific requirement (ISO string)
+          iat: Math.floor(Date.now() / 1000),
           nonce: crypto.randomUUID().replace(/-/g, '')
         })
         .encrypt(key);

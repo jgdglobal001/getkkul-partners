@@ -16,6 +16,7 @@ export default function Step3Page() {
   });
   const [platformUrls, setPlatformUrls] = useState<string[]>([]);
   const [mobileAppUrls, setMobileAppUrls] = useState<string[]>([]);
+  const [debugError, setDebugError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session?.user?.id) {
@@ -283,6 +284,18 @@ export default function Step3Page() {
                 겟꿀 파트너스 활동에 따른 수입 지급의 최대 금액은 1개월 기준 3,000만원이며, 이를 초과하여 발생한 수입은 이월되거나 지급되지 않습니다.
               </p>
             </div>
+
+            {/* 디버그 에러 메시지 (복사용) */}
+            {debugError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-600 font-bold mb-2">오류가 발생했습니다 (아래 내용을 복사해주세요):</p>
+                <textarea
+                  readOnly
+                  className="w-full h-48 p-2 text-xs border border-red-300 rounded bg-white text-gray-800 font-mono"
+                  value={debugError}
+                />
+              </div>
+            )}
 
             {/* 버튼 */}
             <div className="flex gap-4 pt-6">
