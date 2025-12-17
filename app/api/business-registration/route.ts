@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import * as jose from 'jose';
 
-export const runtime = 'nodejs'; // JWE 암호화(jose) 호환을 위해 nodejs 사용
+export const runtime = 'edge';
 
 // 은행 코드 매핑
 const BANK_CODES: Record<string, string> = {
