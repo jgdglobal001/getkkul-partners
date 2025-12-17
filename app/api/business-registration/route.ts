@@ -123,10 +123,7 @@ export async function POST(request: NextRequest) {
           businessNumber: bizNumClean,
           name: businessName,
           representativeName: representativeName,
-        };
-        // Add Manager info for CORPORATE
-        payload.manager = {
-          name: contactName,
+          // Move contact info INSIDE company object
           email: contactEmail,
           phoneNumber: contactPhone?.replace(/-/g, '')
         };
