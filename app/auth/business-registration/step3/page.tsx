@@ -62,6 +62,7 @@ export default function Step3Page() {
   };
 
   const handleNext = async () => {
+    setDebugError(null);
     if (!isNextButtonEnabled) {
       alert('플랫폼 또는 모바일 앱 URL을 최소 1개 추가하고, 최종 승인에 동의해주세요.');
       return;
@@ -128,7 +129,8 @@ export default function Step3Page() {
       } else if (msg.includes('Status: 500')) {
         msg += '\n\n[팁] 은행, 계좌번호, 예금주명이 정확한지 확인해주세요.\n(특히 예금주명이 은행 앱에서 잘려서 표시되는지 확인해보세요!)';
       }
-      alert(msg);
+      setDebugError(msg);
+      alert("오류가 발생했습니다. 하단의 붉은 박스 내용을 확인해주세요.");
     }
   };
 
@@ -322,4 +324,3 @@ export default function Step3Page() {
     </div>
   );
 }
-
