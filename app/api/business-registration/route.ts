@@ -201,6 +201,11 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('[API] Critical Error:', error);
+
     return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ message: 'Business Registration API is active' }, { status: 200 });
 }
