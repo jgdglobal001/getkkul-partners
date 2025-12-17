@@ -267,12 +267,12 @@ export default function Step2Page() {
                 onClick={handleVerifyBusiness}
                 disabled={!isVerifyButtonEnabled || verifyLoading}
                 className={`w-full px-4 py-3 rounded-lg font-bold transition ${isBusinessVerified
-                    ? 'bg-green-500 text-white cursor-default'
-                    : !isVerifyButtonEnabled
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : verifyLoading
-                        ? 'bg-gray-400 text-gray-600 cursor-wait'
-                        : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                  ? 'bg-green-500 text-white cursor-default'
+                  : !isVerifyButtonEnabled
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : verifyLoading
+                      ? 'bg-gray-400 text-gray-600 cursor-wait'
+                      : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
                   }`}
               >
                 {isBusinessVerified ? '✓ 확인됨' : verifyLoading ? '확인중...' : '확인하기'}
@@ -381,6 +381,16 @@ export default function Step2Page() {
                 <option value="우리은행">우리은행</option>
                 <option value="신한은행">신한은행</option>
                 <option value="하나은행">하나은행</option>
+                <option value="기업은행">기업은행</option>
+                <option value="농협은행">농협은행</option>
+                <option value="카카오뱅크">카카오뱅크</option>
+                <option value="토스뱅크">토스뱅크</option>
+                <option value="부산은행">부산은행</option>
+                <option value="대구은행">대구은행</option>
+                <option value="광주은행">광주은행</option>
+                <option value="SC제일은행">SC제일은행</option>
+                <option value="우체국">우체국</option>
+                <option value=" 새마을금고"> 새마을금고</option>
               </select>
             </div>
 
@@ -404,6 +414,7 @@ export default function Step2Page() {
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                 />
+                <p className="text-xs text-red-500 mt-1">※ 은행 앱/인터넷뱅킹상의 <b>정확한 예금주명</b>을 입력해주세요. (글자수 제한으로 잘린 경우 잘린 그대로 입력)</p>
               </div>
             </div>
 

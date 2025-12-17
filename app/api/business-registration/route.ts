@@ -96,10 +96,9 @@ export async function POST(request: NextRequest) {
 
     if (secretKey && securityKey) {
       try {
-        const bankCode = BANK_CODES[bankName] || BANK_CODES['국민은행']; // 기본값 처리 혹은 에러
-
+        const bankCode = BANK_CODES[bankName];
         if (!bankCode) {
-          throw new Error(`지원하지 않는 은행입니다: ${bankName}`);
+          return NextResponse.json({ error: `지원하지 않는 은행입니다: ${bankName}` }, { status: 400 });
         }
 
         // 사업자 유형 매핑
@@ -153,6 +152,12 @@ export async function POST(request: NextRequest) {
           .encrypt(key);
 
         const basicAuth = Buffer.from(secretKey + ':').toString('base64');
+
+        // [DEBUG] 페이로드 로깅 (민감정보 마스킹)
+        const debugPayload = { ...payload };
+        if (debugPayload.account) debugPayload.account = { ...debugPayload.account, accountNumber: '***' };
+        if (debugPayload.individual) debugPayload.individual = { ...debugPayload.individual, phoneNumber: '***' };
+        console.log(`[API Debug] Payload to Toss:`, JSON.stringify(debugPayload, null, 2));
 
         console.log(`[API] 토스 v2/payouts/sellers 호출 (Type: ${tossBusinessType})...`);
         const tossResponse = await fetch('https://api.tosspayments.com/v2/payouts/sellers', {

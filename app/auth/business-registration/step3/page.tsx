@@ -114,7 +114,11 @@ export default function Step3Page() {
       router.push('/auth/business-registration/complete');
     } catch (error: any) {
       console.error('Error:', error);
-      alert(error.message || '사업자 등록 정보 저장 중 오류가 발생했습니다.');
+      let msg = error.message || '사업자 등록 정보 저장 중 오류가 발생했습니다.';
+      if (msg.includes('Status: 500')) {
+        msg += '\n\n[팁] 은행, 계좌번호, 예금주명이 정확한지 확인해주세요.\n(특히 예금주명이 은행 앱에서 잘려서 표시되는지 확인해보세요!)';
+      }
+      alert(msg);
     }
   };
 
