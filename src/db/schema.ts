@@ -153,6 +153,8 @@ export const businessRegistrations = pgTable('business_registrations', {
   bankbookDoc: text('bankbookDoc'),
   step: integer('step').notNull().default(1),
   isCompleted: boolean('isCompleted').notNull().default(false),
+  sellerId: text('sellerId'), // 토스 지급대행용 Seller ID (파트너 ID와 동일)
+  tossStatus: text('tossStatus'), // 토스 심사 상태 (READY, COMPLETED 등)
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow().$onUpdate(() => new Date()),
 });
