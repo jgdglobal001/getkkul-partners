@@ -112,9 +112,9 @@ export default function Step3Page() {
 
       // 완료 페이지로 이동
       router.push('/auth/business-registration/complete');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
-      alert('사업자 등록 정보 저장 중 오류가 발생했습니다.');
+      alert(error.message || '사업자 등록 정보 저장 중 오류가 발생했습니다.');
     }
   };
 
@@ -283,8 +283,8 @@ export default function Step3Page() {
                 onClick={handleNext}
                 disabled={!isNextButtonEnabled}
                 className={`flex-1 font-bold py-3 px-4 rounded-full transition ${isNextButtonEnabled
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}
               >
                 다음 &gt;

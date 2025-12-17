@@ -53,6 +53,22 @@ export default function Step2Page() {
     } else {
       router.push('/auth/business-registration/step1');
     }
+
+    // 이전에 입력한 Step2 데이터가 있으면 불러오기
+    const savedStep2Data = sessionStorage.getItem('step2Data');
+    if (savedStep2Data) {
+      const parsed = JSON.parse(savedStep2Data);
+      setFormData(prev => ({
+        ...prev,
+        ...parsed
+      }));
+      // 이미 인증된 상태라고 가정해야 할까? 
+      // 보통 수정하러 돌아온 것이므로 인증 상태는 초기화하는 게 안전하거나, 
+      // 인증된 값(Business Number 등)이 변경되지 않았다면 유지해야 함.
+      // 여기서는 일단 인증 상태는 풀어두고 다시 인증하게 하거나, 
+      // 아니면 'isBusinessVerified'도 저장했어야 함.
+      // 간단히 값만 복원.
+    }
   }, [session, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -159,256 +175,255 @@ export default function Step2Page() {
             <div className="w-12 h-12 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-lg">3</div>
           </div>
 
-        {/* 메인 콘텐츠 */}
-        <div className="bg-white rounded-lg p-8 shadow-sm border border-gray-200 space-y-6">
-          {/* 결제자 정보 섹션 */}
-          <div>
-            <h2 className="text-lg font-bold mb-4">결제자 정보</h2>
-          </div>
+          {/* 메인 콘텐츠 */}
+          <div className="bg-white rounded-lg p-8 shadow-sm border border-gray-200 space-y-6">
+            {/* 결제자 정보 섹션 */}
+            <div>
+              <h2 className="text-lg font-bold mb-4">결제자 정보</h2>
+            </div>
 
-          {/* 사업자명 */}
-          <div>
-            <label className="block text-sm font-bold mb-2">사업자명 *</label>
-            <input
-              type="text"
-              name="businessName"
-              value={formData.businessName}
-              onChange={handleInputChange}
-              placeholder="사업자 등록 증명서 또는 신분증 상의 사업자명"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {/* 사업자번호 */}
-          <div>
-            <label className="block text-sm font-bold mb-2">사업자번호 *</label>
-            <div className="flex gap-2 items-center">
+            {/* 사업자명 */}
+            <div>
+              <label className="block text-sm font-bold mb-2">사업자명 *</label>
               <input
                 type="text"
-                name="businessNumber1"
-                value={formData.businessNumber1}
+                name="businessName"
+                value={formData.businessName}
                 onChange={handleInputChange}
-                maxLength={3}
-                placeholder="123"
+                placeholder="사업자 등록 증명서 또는 신분증 상의 사업자명"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* 사업자번호 */}
+            <div>
+              <label className="block text-sm font-bold mb-2">사업자번호 *</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  name="businessNumber1"
+                  value={formData.businessNumber1}
+                  onChange={handleInputChange}
+                  maxLength={3}
+                  placeholder="123"
+                  disabled={isBusinessVerified}
+                  className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
+                />
+                <span>-</span>
+                <input
+                  type="text"
+                  name="businessNumber2"
+                  value={formData.businessNumber2}
+                  onChange={handleInputChange}
+                  maxLength={2}
+                  placeholder="45"
+                  disabled={isBusinessVerified}
+                  className="w-16 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
+                />
+                <span>-</span>
+                <input
+                  type="text"
+                  name="businessNumber3"
+                  value={formData.businessNumber3}
+                  onChange={handleInputChange}
+                  maxLength={5}
+                  placeholder="67890"
+                  disabled={isBusinessVerified}
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
+                />
+              </div>
+            </div>
+
+            {/* 대표자명 */}
+            <div>
+              <label className="block text-sm font-bold mb-2">대표자명 *</label>
+              <input
+                type="text"
+                name="representativeName"
+                value={formData.representativeName}
+                onChange={handleInputChange}
+                placeholder="사업자등록증의 대표자명"
                 disabled={isBusinessVerified}
-                className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
               />
-              <span>-</span>
+            </div>
+
+            {/* 개업일자 */}
+            <div>
+              <label className="block text-sm font-bold mb-2">개업일자 *</label>
               <input
-                type="text"
-                name="businessNumber2"
-                value={formData.businessNumber2}
+                type="date"
+                name="startDate"
+                value={formData.startDate}
                 onChange={handleInputChange}
-                maxLength={2}
-                placeholder="45"
                 disabled={isBusinessVerified}
-                className="w-16 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
-              />
-              <span>-</span>
-              <input
-                type="text"
-                name="businessNumber3"
-                value={formData.businessNumber3}
-                onChange={handleInputChange}
-                maxLength={5}
-                placeholder="67890"
-                disabled={isBusinessVerified}
-                className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
               />
             </div>
-          </div>
 
-          {/* 대표자명 */}
-          <div>
-            <label className="block text-sm font-bold mb-2">대표자명 *</label>
-            <input
-              type="text"
-              name="representativeName"
-              value={formData.representativeName}
-              onChange={handleInputChange}
-              placeholder="사업자등록증의 대표자명"
-              disabled={isBusinessVerified}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
-            />
-          </div>
-
-          {/* 개업일자 */}
-          <div>
-            <label className="block text-sm font-bold mb-2">개업일자 *</label>
-            <input
-              type="date"
-              name="startDate"
-              value={formData.startDate}
-              onChange={handleInputChange}
-              disabled={isBusinessVerified}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100"
-            />
-          </div>
-
-          {/* 확인하기 버튼 */}
-          <div>
-            <button
-              onClick={handleVerifyBusiness}
-              disabled={!isVerifyButtonEnabled || verifyLoading}
-              className={`w-full px-4 py-3 rounded-lg font-bold transition ${
-                isBusinessVerified
-                  ? 'bg-green-500 text-white cursor-default'
-                  : !isVerifyButtonEnabled
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : verifyLoading
-                  ? 'bg-gray-400 text-gray-600 cursor-wait'
-                  : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
-              }`}
-            >
-              {isBusinessVerified ? '✓ 확인됨' : verifyLoading ? '확인중...' : '확인하기'}
-            </button>
-          </div>
-
-          {/* 사업자 정보 섹션 제목 */}
-          <div className="pt-4">
-            <h3 className="text-base font-bold mb-4">사업자 정보</h3>
-          </div>
-
-          {/* 사업자 주소 */}
-          <div>
-            <label className="block text-sm font-bold mb-2">사업자 주소 *</label>
-            <input
-              type="text"
-              name="businessAddress"
-              value={formData.businessAddress}
-              onChange={handleInputChange}
-              placeholder="사업자등록증의 주소 그대로 작성해주세요!"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {/* 업태 / 종목 */}
-          <div className="grid grid-cols-2 gap-4">
+            {/* 확인하기 버튼 */}
             <div>
-              <label className="block text-sm font-bold mb-2">업태 *</label>
+              <button
+                onClick={handleVerifyBusiness}
+                disabled={!isVerifyButtonEnabled || verifyLoading}
+                className={`w-full px-4 py-3 rounded-lg font-bold transition ${isBusinessVerified
+                    ? 'bg-green-500 text-white cursor-default'
+                    : !isVerifyButtonEnabled
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : verifyLoading
+                        ? 'bg-gray-400 text-gray-600 cursor-wait'
+                        : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                  }`}
+              >
+                {isBusinessVerified ? '✓ 확인됨' : verifyLoading ? '확인중...' : '확인하기'}
+              </button>
+            </div>
+
+            {/* 사업자 정보 섹션 제목 */}
+            <div className="pt-4">
+              <h3 className="text-base font-bold mb-4">사업자 정보</h3>
+            </div>
+
+            {/* 사업자 주소 */}
+            <div>
+              <label className="block text-sm font-bold mb-2">사업자 주소 *</label>
               <input
                 type="text"
-                name="businessCategory"
-                value={formData.businessCategory}
+                name="businessAddress"
+                value={formData.businessAddress}
+                onChange={handleInputChange}
+                placeholder="사업자등록증의 주소 그대로 작성해주세요!"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* 업태 / 종목 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold mb-2">업태 *</label>
+                <input
+                  type="text"
+                  name="businessCategory"
+                  value={formData.businessCategory}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">종목 *</label>
+                <input
+                  type="text"
+                  name="businessType"
+                  value={formData.businessType}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* 연락처 섹션 제목 */}
+            <div className="pt-4">
+              <h3 className="text-base font-bold mb-4">연락처</h3>
+            </div>
+
+            {/* 연락처 정보 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold mb-2">이름 *</label>
+                <input
+                  type="text"
+                  name="contactName"
+                  value={formData.contactName}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">연락처 *</label>
+                <input
+                  type="tel"
+                  name="contactPhone"
+                  value={formData.contactPhone}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* 이메일 */}
+            <div>
+              <label className="block text-sm font-bold mb-2">이메일 *</label>
+              <input
+                type="email"
+                name="contactEmail"
+                value={formData.contactEmail}
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
               />
             </div>
+
+            {/* 계좌정보 섹션 제목 */}
+            <div className="pt-4">
+              <h3 className="text-base font-bold mb-4">계좌정보</h3>
+            </div>
+
+            {/* 계좌 정보 */}
             <div>
-              <label className="block text-sm font-bold mb-2">종목 *</label>
-              <input
-                type="text"
-                name="businessType"
-                value={formData.businessType}
+              <label className="block text-sm font-bold mb-2">은행 *</label>
+              <select
+                name="bankName"
+                value={formData.bankName}
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-              />
+              >
+                <option value="">은행 선택</option>
+                <option value="국민은행">국민은행</option>
+                <option value="우리은행">우리은행</option>
+                <option value="신한은행">신한은행</option>
+                <option value="하나은행">하나은행</option>
+              </select>
             </div>
-          </div>
 
-          {/* 연락처 섹션 제목 */}
-          <div className="pt-4">
-            <h3 className="text-base font-bold mb-4">연락처</h3>
-          </div>
-
-          {/* 연락처 정보 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold mb-2">이름 *</label>
-              <input
-                type="text"
-                name="contactName"
-                value={formData.contactName}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold mb-2">계좌번호 *</label>
+                <input
+                  type="text"
+                  name="accountNumber"
+                  value={formData.accountNumber}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">계좌주 *</label>
+                <input
+                  type="text"
+                  name="accountHolder"
+                  value={formData.accountHolder}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-bold mb-2">연락처 *</label>
-              <input
-                type="tel"
-                name="contactPhone"
-                value={formData.contactPhone}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-              />
+
+            {/* 버튼 */}
+            <div className="flex gap-4 pt-6">
+              <button
+                onClick={handlePrev}
+                className="flex-1 border border-gray-300 text-gray-700 font-bold py-3 px-4 rounded-full hover:bg-gray-50 transition"
+              >
+                &lt; 이전
+              </button>
+              <button
+                onClick={handleNext}
+                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-full transition"
+              >
+                다음 &gt;
+              </button>
             </div>
-          </div>
-
-          {/* 이메일 */}
-          <div>
-            <label className="block text-sm font-bold mb-2">이메일 *</label>
-            <input
-              type="email"
-              name="contactEmail"
-              value={formData.contactEmail}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {/* 계좌정보 섹션 제목 */}
-          <div className="pt-4">
-            <h3 className="text-base font-bold mb-4">계좌정보</h3>
-          </div>
-
-          {/* 계좌 정보 */}
-          <div>
-            <label className="block text-sm font-bold mb-2">은행 *</label>
-            <select
-              name="bankName"
-              value={formData.bankName}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            >
-              <option value="">은행 선택</option>
-              <option value="국민은행">국민은행</option>
-              <option value="우리은행">우리은행</option>
-              <option value="신한은행">신한은행</option>
-              <option value="하나은행">하나은행</option>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold mb-2">계좌번호 *</label>
-              <input
-                type="text"
-                name="accountNumber"
-                value={formData.accountNumber}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold mb-2">계좌주 *</label>
-              <input
-                type="text"
-                name="accountHolder"
-                value={formData.accountHolder}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* 버튼 */}
-          <div className="flex gap-4 pt-6">
-            <button
-              onClick={handlePrev}
-              className="flex-1 border border-gray-300 text-gray-700 font-bold py-3 px-4 rounded-full hover:bg-gray-50 transition"
-            >
-              &lt; 이전
-            </button>
-            <button
-              onClick={handleNext}
-              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-full transition"
-            >
-              다음 &gt;
-            </button>
           </div>
         </div>
-      </div>
       </div>
     </div>
   );
