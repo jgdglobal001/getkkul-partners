@@ -124,6 +124,12 @@ export async function POST(request: NextRequest) {
           name: businessName,
           representativeName: representativeName,
         };
+        // Add Manager info for CORPORATE
+        payload.manager = {
+          name: contactName,
+          email: contactEmail,
+          phoneNumber: contactPhone?.replace(/-/g, '')
+        };
       }
 
       // Encrypt with btoa/TextEncoder (Edge Safe)
