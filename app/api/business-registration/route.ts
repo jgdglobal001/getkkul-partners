@@ -37,7 +37,8 @@ const BANK_CODES: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
-  console.log('[API] Business Registration POST Request Received'); // 진입 로그 추가
+  console.log('[API] Business Registration POST Request Received (Loud Check)');
+  throw new Error('TEST_ERROR_FOR_LOG_VISIBILITY: If you see this, Logging is WORKING.');
 
   try {
     // 세션 확인
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
         else tossBusinessType = 'CORPORATE'; // 법인/개인 -> 법인 취급
 
         const payload: any = {
-          refSellerId: session.user.id,
+          refSellerId: session!.user!.id,
           businessType: tossBusinessType,
           account: {
             bankCode: bankCode,
@@ -144,8 +145,9 @@ export async function POST(request: NextRequest) {
 
         // JWE 암호화 준비
         // Security Key가 Hex String인지 확인
-        const isHex = /^[0-9A-Fa-f]+$/.test(securityKey);
-        const key = isHex ? Buffer.from(securityKey, 'hex') : Buffer.from(securityKey, 'utf-8');
+        const keyStr = securityKey as string;
+        const isHex = /^[0-9A-Fa-f]+$/.test(keyStr);
+        const key = isHex ? Buffer.from(keyStr, 'hex') : Buffer.from(keyStr, 'utf-8');
 
         const encryptedBody = await new jose.CompactEncrypt(
           new TextEncoder().encode(JSON.stringify(payload))
@@ -195,7 +197,7 @@ export async function POST(request: NextRequest) {
 
         const tossResult = await tossResponse.json();
         console.log('✅ 토스 셀러 등록 성공:', tossResult);
-        tossSellerId = session.user.id; // 성공 시 ID 저장
+        tossSellerId = session!.user!.id; // 성공 시 ID 저장
 
       } catch (tossError: any) {
         console.error('❌ 토스 등록 중 예외 발생:', tossError);
@@ -213,7 +215,7 @@ export async function POST(request: NextRequest) {
     const existingByUserIdResults = await db
       .select()
       .from(businessRegistrations)
-      .where(eq(businessRegistrations.userId, session.user.id))
+      .where(eq(businessRegistrations.userId, session!.user!.id))
       .limit(1);
     const existingByUserId = existingByUserIdResults[0];
 
@@ -244,7 +246,7 @@ export async function POST(request: NextRequest) {
           sellerId: tossSellerId, // 토스 ID 저장
           tossStatus: tossSellerId ? 'COMPLETED' : 'FAILED',
         })
-        .where(eq(businessRegistrations.userId, session.user.id))
+        .where(eq(businessRegistrations.userId, session!.user!.id))
         .returning();
       businessRegistration = updated[0];
     } else {
@@ -252,7 +254,7 @@ export async function POST(request: NextRequest) {
       const created = await db
         .insert(businessRegistrations)
         .values({
-          userId: session.user.id,
+          userId: session!.user!.id,
           businessType: businessType || '법인',
           businessName,
           businessNumber: fullBusinessNumber,
