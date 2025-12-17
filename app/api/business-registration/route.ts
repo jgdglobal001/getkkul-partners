@@ -130,8 +130,6 @@ export async function POST(request: NextRequest) {
       console.log('[API] Encrypting payload...');
       const keyStr = securityKey as string;
       const isHex = /^[0-9A-Fa-f]+$/.test(keyStr);
-      // jose prefers Uint8Array/Buffer logic. Node Buffer polyfill is usually present in NextJS Edge.
-      // We verified 'jose' logic works in previous step.
       const key = isHex ? Buffer.from(keyStr, 'hex') : Buffer.from(keyStr, 'utf-8');
 
       const encryptedBody = await new jose.CompactEncrypt(
@@ -144,7 +142,16 @@ export async function POST(request: NextRequest) {
 
       // Log Payload (Masked)
       const debugPayload = { ...payload };
-      if (debugPayload.account) debugPayload.account.accountNumber = '***';
+      if (debugPayload.account) {
+        // Ensure explicit string conversion for critical fields
+        debugPayload.account.accountNumber = String(body.accountNumber);
+        debugPayload.account.bankCode = String(BANK_CODES[bankName]);
+      }
+      // Sanitized check
+      if (debugPayload.individual) {
+        debugPayload.individual.phoneNumber = String(contactPhone).replace(/-/g, '');
+      }
+
       console.log('[API Debug] Payload to Toss:', JSON.stringify(debugPayload, null, 2));
 
       console.log('[API] Calling Toss...');
@@ -157,11 +164,22 @@ export async function POST(request: NextRequest) {
       if (!tossResponse.ok) {
         const errorText = await tossResponse.text();
         console.error('❌ Toss Error:', errorText);
+
+        let errDetail = errorText;
         try {
-          const errJson = JSON.parse(errorText);
-          if (errJson.error) return NextResponse.json({ error: `토스 에러: ${errJson.error.message}` }, { status: 400 });
+          const json = JSON.parse(errorText);
+          errDetail = json.error?.message || errorText;
         } catch (e) { }
-        return NextResponse.json({ error: `토스 등록 실패 [${tossResponse.status}]: ${errorText}` }, { status: 400 });
+
+        // RETURN DEBUG INFO TO FRONTEND directly
+        return NextResponse.json({
+          error: `Toss 500 Error: ${errDetail}`,
+          details: {
+            tossStatus: tossResponse.status,
+            tossMessage: errorText,
+            sentPayload: debugPayload // User can see this in Browser Console!
+          }
+        }, { status: 400 });
       }
 
       const tossResult = await tossResponse.json();
