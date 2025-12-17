@@ -21,6 +21,8 @@ const BANK_CODES = {
     '씨티은행': '027', '우리은행': '020', '우체국': '071', '저축은행중앙회': '050',
     '전북은행': '037', '제주은행': '035', '카카오뱅크': '090', '케이뱅크': '089',
     '토스뱅크': '092', '하나은행': '081', '새마을금고': '045',
+    // 별칭 추가
+    '국민은행': '004', '농협': '011', '신한': '088', '우리': '020', '하나': '081', '기업': '003',
 };
 
 async function run() {
@@ -43,7 +45,12 @@ async function run() {
     }
 
     // JWE 암호화 준비
-    const key = Buffer.from(SECURITY_KEY, 'hex');
+    // Security Key가 Hex String인지 확인
+    const isHex = /^[0-9A-Fa-f]+$/.test(SECURITY_KEY);
+    const key = isHex ? Buffer.from(SECURITY_KEY, 'hex') : Buffer.from(SECURITY_KEY, 'utf-8');
+
+    // 키 길이 디버깅 (로그에는 길이만 출력)
+    console.log(`🔑 Security Key Length: ${key.length} bytes`);
     const basicAuth = Buffer.from(SECRET_KEY + ':').toString('base64');
 
     let successCount = 0;
@@ -74,17 +81,36 @@ async function run() {
             const bizNumClean = businessNumber.replace(/-/g, '');
 
             // Payload 생성
+            // 1. 사업자 유형 매핑
+            let tossBusinessType = 'CORPORATE';
+            if (partner.businessType === '개인') tossBusinessType = 'INDIVIDUAL';
+            else if (partner.businessType === '개인사업자') tossBusinessType = 'INDIVIDUAL_BUSINESS';
+
             const payload = {
-                sellerId: userId,
-                businessNumber: bizNumClean,
-                companyName: businessName,
-                representativeName: representativeName,
+                refSellerId: userId + '_' + Date.now(),
+                businessType: tossBusinessType,
                 account: {
                     bankCode: bankCode,
                     accountNumber: accountNumber,
                     holderName: accountHolder
                 }
             };
+
+            if (tossBusinessType === 'INDIVIDUAL') {
+                payload.individual = {
+                    name: representativeName,
+                    email: partner.contactEmail,
+                    phoneNumber: partner.contactPhone ? partner.contactPhone.replace(/-/g, '') : ''
+                };
+            } else {
+                payload.company = {
+                    businessNumber: bizNumClean,
+                    name: businessName,
+                    representativeName: representativeName
+                };
+            }
+
+            console.log('[DEBUG] Payload:', JSON.stringify(payload, null, 2));
 
             // JWE 암호화
             const encryptedBody = await new jose.CompactEncrypt(
@@ -93,8 +119,9 @@ async function run() {
                 .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
                 .encrypt(key);
 
-            // Toss API 호출
-            const response = await fetch('https://api.tosspayments.com/v2/sellers', {
+            // Toss API 호출 (지급대행)
+            console.log(`[API] Toss v2/payouts/sellers 호출 (Type: ${tossBusinessType})...`);
+            const response = await fetch('https://api.tosspayments.com/v2/payouts/sellers', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Basic ${basicAuth}`,
@@ -105,10 +132,7 @@ async function run() {
 
             if (!response.ok) {
                 const errText = await response.text();
-                console.error(`❌ Toss API 실패: ${errText}`);
-
-                // 이미 등록된 셀러라면(에러코드로 판단 어려우면 그냥 업데이트 시도 가능)
-                // 일단 실패로 처리
+                console.error(`❌ Toss API 실패: [${response.status} ${response.statusText}] ${errText || "(Empty Body)"}`);
                 failCount++;
                 continue;
             }
