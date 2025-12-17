@@ -37,6 +37,8 @@ const BANK_CODES: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
+  console.log('[API] Business Registration POST Request Received'); // 진입 로그 추가
+
   try {
     // 세션 확인
     const session = await getEdgeSession();
@@ -151,7 +153,8 @@ export async function POST(request: NextRequest) {
           .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
           .encrypt(key);
 
-        const basicAuth = Buffer.from(secretKey + ':').toString('base64');
+        // Basic Auth: Edge Safe way (btoa is global in Edge)
+        const basicAuth = btoa(secretKey + ':');
 
         // [DEBUG] 페이로드 로깅 (민감정보 마스킹)
         const debugPayload = { ...payload };
