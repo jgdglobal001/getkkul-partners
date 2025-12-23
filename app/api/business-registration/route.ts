@@ -174,10 +174,10 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Authorization': `Basic ${basicAuth}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain', // 가이드: ENCRYPTION 모드일 때 필수
           'TossPayments-Api-Security-Mode': 'ENCRYPTION'
         },
-        body: JSON.stringify({ body: encryptedBody })
+        body: encryptedBody // 가이드: JWE 문자열 그 자체를 본문으로 전송
       });
 
       // 응답 복호화 로직 추가
