@@ -137,12 +137,13 @@ export async function POST(request: NextRequest) {
       );
 
       // iat: yyyy-MM-dd'T'HH:mm:ss±hh:mm ISO 8601 형식
-      // 가이드의 자바 예제 OffsetDateTime.now(ZoneId.of("Asia/Seoul")).toString()와 완벽히 일치하도록 생성
-      // 예: 2024-01-24T14:40:10.123+09:00
+      // 가이드 규격 준수: 밀리초(.SSS)를 포함하지 않아야 함
+      // 예: 2024-01-24T14:40:10+09:00
       const now = new Date();
       const kstOffset = 9 * 60 * 60 * 1000;
       const kstDate = new Date(now.getTime() + kstOffset);
-      const iat = kstDate.toISOString().replace('Z', '+09:00');
+      // 2024-01-24T05:40:10.123Z -> 2024-01-24T05:40:10+09:00
+      const iat = kstDate.toISOString().replace(/\.\d+Z$/, '+09:00');
 
       // nonce: UUID와 같이 충분히 무작위적인 고유 값 (하이픈 유지)
       const nonce = crypto.randomUUID();
@@ -174,7 +175,7 @@ export async function POST(request: NextRequest) {
         headers: {
           'Authorization': `Basic ${basicAuth}`,
           'Content-Type': 'application/json',
-          'TossPayments-Api-Security-Mode': 'ENCRYPTION'
+          'TossPayments-api-security-mode': 'ENCRYPTION'
         },
         body: JSON.stringify({ body: encryptedBody })
       });
