@@ -131,17 +131,21 @@ export async function POST(request: NextRequest) {
       console.log('[API] Encrypting payload...');
       const keyStr = securityKey as string;
 
-      // Hex 키를 Uint8Array로 변환 (Buffer 의존성 제거)
+      // 가이드: "보안 키는 64자의 Hexadecimal 문자열입니다. 보안 키를 바이트로 전환해야 됩니다."
       const key = new Uint8Array(
         keyStr.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
       );
 
-      // iat: ISO 8601 형식 (yyyy-MM-dd'T'HH:mm:ss+09:00)
-      // Edge Runtime에서 안정적인 시간 생성을 위해 수동 계산
+      // iat: yyyy-MM-dd'T'HH:mm:ss±hh:mm ISO 8601 형식
+      // 가이드의 자바 예제 OffsetDateTime.now(ZoneId.of("Asia/Seoul")).toString()와 완벽히 일치하도록 생성
+      // 예: 2024-01-24T14:40:10.123+09:00
       const now = new Date();
       const kstOffset = 9 * 60 * 60 * 1000;
-      const kstTime = new Date(now.getTime() + kstOffset);
-      const iat = kstTime.toISOString().replace(/\.\d+Z$/, '+09:00');
+      const kstDate = new Date(now.getTime() + kstOffset);
+      const iat = kstDate.toISOString().replace('Z', '+09:00');
+
+      // nonce: UUID와 같이 충분히 무작위적인 고유 값 (하이픈 유지)
+      const nonce = crypto.randomUUID();
 
       const encryptedBody = await new jose.CompactEncrypt(
         new TextEncoder().encode(JSON.stringify(payload))
@@ -150,7 +154,7 @@ export async function POST(request: NextRequest) {
           alg: 'dir',
           enc: 'A256GCM',
           iat: iat,
-          nonce: crypto.randomUUID().replace(/-/g, '')
+          nonce: nonce
         })
         .encrypt(key);
 
@@ -162,6 +166,7 @@ export async function POST(request: NextRequest) {
         debugPayload.account.accountNumber = '********';
       }
       console.log('[API Debug] Payload to Toss:', JSON.stringify(debugPayload, null, 2));
+      console.log('[API Debug] JWE Protected Header:', { alg: 'dir', enc: 'A256GCM', iat, nonce });
 
       console.log('[API] Calling Toss...');
       const tossResponse = await fetch('https://api.tosspayments.com/v2/payouts/sellers', {
