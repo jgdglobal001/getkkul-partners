@@ -105,8 +105,12 @@ export async function POST(request: NextRequest) {
       else if (businessType === '개인사업자') tossBusinessType = 'INDIVIDUAL_BUSINESS';
       else tossBusinessType = 'CORPORATE';
 
+      // refSellerId는 1~20자 제한이 있음
+      // userId(cuid)는 25자이므로 앞 20자만 사용
+      const refSellerId = userId.slice(0, 20);
+
       const payload: any = {
-        refSellerId: userId,
+        refSellerId: refSellerId,
         businessType: tossBusinessType,
         account: { bankCode, accountNumber, holderName: accountHolder }
       };
@@ -228,7 +232,8 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('✅ Toss Success:', decryptedResponse);
-      tossSellerId = userId;
+      // Toss에서 반환하는 실제 sellerId 또는 refSellerId 저장
+      tossSellerId = decryptedResponse.entityBody?.id || decryptedResponse.entityBody?.refSellerId || refSellerId;
       if (decryptedResponse.entityBody?.status) {
         tossStatus = decryptedResponse.entityBody.status;
       } else if (decryptedResponse.status) {
