@@ -309,10 +309,11 @@ export async function GET(request: NextRequest) {
 
     if (existing[0]) {
       console.log('[API] GET - Found business registration for user');
-      return NextResponse.json(existing[0], { status: 200 });
+      // 프론트엔드에서 result.data로 접근하므로 { data: ... } 형식으로 반환
+      return NextResponse.json({ data: existing[0] }, { status: 200 });
     } else {
       console.log('[API] GET - No business registration found');
-      return NextResponse.json({ message: 'No registration found' }, { status: 404 });
+      return NextResponse.json({ data: null, message: 'No registration found' }, { status: 404 });
     }
 
   } catch (error: any) {
