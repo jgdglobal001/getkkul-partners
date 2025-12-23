@@ -142,8 +142,8 @@ export async function POST(request: NextRequest) {
       const now = new Date();
       const kstOffset = 9 * 60 * 60 * 1000;
       const kstDate = new Date(now.getTime() + kstOffset);
-      // 2024-01-24T05:40:10.123Z -> 2024-01-24T05:40:10+09:00
-      const iat = kstDate.toISOString().replace(/\.\d+Z$/, '+09:00');
+      // split('.')[0]을 사용하여 밀리초 부분을 확실히 제거
+      const iat = kstDate.toISOString().split('.')[0] + '+09:00';
 
       // nonce: UUID와 같이 충분히 무작위적인 고유 값 (하이픈 유지)
       const nonce = crypto.randomUUID();
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
         headers: {
           'Authorization': `Basic ${basicAuth}`,
           'Content-Type': 'application/json',
-          'TossPayments-api-security-mode': 'ENCRYPTION'
+          'TossPayments-Api-Security-Mode': 'ENCRYPTION'
         },
         body: JSON.stringify({ body: encryptedBody })
       });
