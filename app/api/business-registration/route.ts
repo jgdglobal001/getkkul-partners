@@ -137,13 +137,24 @@ export async function POST(request: NextRequest) {
       );
 
       // iat: yyyy-MM-dd'T'HH:mm:ss±hh:mm ISO 8601 형식
-      // 가이드 규격 준수: 밀리초(.SSS)를 포함하지 않아야 함
+      // Toss 공식 가이드 규격 준수: 밀리초(.SSS)를 포함하지 않아야 함
       // 예: 2024-01-24T14:40:10+09:00
+      //
+      // 올바른 방법: 현재 시간을 KST 포맷으로 직접 생성
       const now = new Date();
-      const kstOffset = 9 * 60 * 60 * 1000;
-      const kstDate = new Date(now.getTime() + kstOffset);
-      // split('.')[0]을 사용하여 밀리초 부분을 확실히 제거
-      const iat = kstDate.toISOString().split('.')[0] + '+09:00';
+      const pad = (n: number) => n.toString().padStart(2, '0');
+
+      // KST는 UTC+9이므로, 한국 시간으로 변환
+      const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+      const year = kstDate.getUTCFullYear();
+      const month = pad(kstDate.getUTCMonth() + 1);
+      const day = pad(kstDate.getUTCDate());
+      const hours = pad(kstDate.getUTCHours());
+      const minutes = pad(kstDate.getUTCMinutes());
+      const seconds = pad(kstDate.getUTCSeconds());
+
+      const iat = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+09:00`;
+      console.log('[API Debug] Generated iat:', iat);
 
       // nonce: UUID와 같이 충분히 무작위적인 고유 값 (하이픈 유지)
       const nonce = crypto.randomUUID();
@@ -170,12 +181,14 @@ export async function POST(request: NextRequest) {
       console.log('[API Debug] JWE Protected Header:', { alg: 'dir', enc: 'A256GCM', iat, nonce });
 
       console.log('[API] Calling Toss...');
-      const tossResponse = await fetch('https://api.tosspayments.com/v2/payouts/sellers', {
+      // 가이드 URL: https://api.tosspayments.com/v2/sellers (셀러 등록)
+      // 주의: /v2/payouts/sellers가 아닌 /v2/sellers 사용!
+      const tossResponse = await fetch('https://api.tosspayments.com/v2/sellers', {
         method: 'POST',
         headers: {
           'Authorization': `Basic ${basicAuth}`,
           'Content-Type': 'text/plain', // 가이드: ENCRYPTION 모드일 때 필수
-          'TossPayments-Api-Security-Mode': 'ENCRYPTION'
+          'TossPayments-api-security-mode': 'ENCRYPTION' // 가이드와 동일한 대소문자
         },
         body: encryptedBody // 가이드: JWE 문자열 그 자체를 본문으로 전송
       });
