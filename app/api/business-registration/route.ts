@@ -90,7 +90,6 @@ export async function POST(request: NextRequest) {
     const bizNumClean = fullBusinessNumber.replace(/-/g, '');
 
     // === Toss API ===
-    console.log('[API] Toss API Process Start...');
     let tossSellerId = null;
     let tossStatus = 'PENDING';
 
@@ -116,16 +115,15 @@ export async function POST(request: NextRequest) {
         payload.individual = {
           name: representativeName,
           email: contactEmail,
-          phoneNumber: contactPhone?.replace(/-/g, '')
+          phone: contactPhone?.replace(/-/g, '')
         };
       } else {
         payload.company = {
-          businessNumber: bizNumClean,
+          businessRegistrationNumber: bizNumClean,
           name: businessName,
           representativeName: representativeName,
-          // Move contact info INSIDE company object
           email: contactEmail,
-          phoneNumber: contactPhone?.replace(/-/g, '')
+          phone: contactPhone?.replace(/-/g, '')
         };
       }
 
@@ -135,13 +133,18 @@ export async function POST(request: NextRequest) {
       const isHex = /^[0-9A-Fa-f]+$/.test(keyStr);
       const key = isHex ? Buffer.from(keyStr, 'hex') : Buffer.from(keyStr, 'utf-8');
 
+      // iat: ISO 8601 형식 (yyyy-MM-dd'T'HH:mm:ss+09:00)
+      const now = new Date();
+      const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+      const iat = kstDate.toISOString().split('.')[0] + '+09:00';
+
       const encryptedBody = await new jose.CompactEncrypt(
         new TextEncoder().encode(JSON.stringify(payload))
       )
         .setProtectedHeader({
           alg: 'dir',
           enc: 'A256GCM',
-          iat: Math.floor(Date.now() / 1000),
+          iat: iat,
           nonce: crypto.randomUUID().replace(/-/g, '')
         })
         .encrypt(key);
@@ -151,49 +154,64 @@ export async function POST(request: NextRequest) {
       // Log Payload (Masked)
       const debugPayload = { ...payload };
       if (debugPayload.account) {
-        // Ensure explicit string conversion for critical fields
-        debugPayload.account.accountNumber = String(body.accountNumber);
-        debugPayload.account.bankCode = String(BANK_CODES[bankName]);
+        debugPayload.account.accountNumber = '********';
       }
-      // Sanitized check
-      if (debugPayload.individual) {
-        debugPayload.individual.phoneNumber = String(contactPhone).replace(/-/g, '');
-      }
-
       console.log('[API Debug] Payload to Toss:', JSON.stringify(debugPayload, null, 2));
 
       console.log('[API] Calling Toss...');
       const tossResponse = await fetch('https://api.tosspayments.com/v2/payouts/sellers', {
         method: 'POST',
-        headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Basic ${basicAuth}`,
+          'Content-Type': 'application/json',
+          'TossPayments-api-security-mode': 'ENCRYPTION'
+        },
         body: JSON.stringify({ body: encryptedBody })
       });
 
+      // 응답 복호화 로직 추가
+      const encryptedResponseText = await tossResponse.text();
+      console.log('[API] Toss raw response received');
+
+      let decryptedResponse;
+      try {
+        // 성공 응답이든 에러 응답이든 암호화되어 오므로 복호화 시도
+        if (encryptedResponseText.startsWith('ey')) { // JWE 형태인 경우
+          const { plaintext } = await jose.compactDecrypt(encryptedResponseText, key);
+          decryptedResponse = JSON.parse(new TextDecoder().decode(plaintext));
+          console.log('[API] Decrypted Response:', JSON.stringify(decryptedResponse, null, 2));
+        } else {
+          decryptedResponse = JSON.parse(encryptedResponseText);
+        }
+      } catch (decryptError) {
+        console.error('[API] Decryption failed or response is not JWE:', decryptError);
+        decryptedResponse = { error: '복호화 실패', raw: encryptedResponseText };
+      }
+
       if (!tossResponse.ok) {
-        const errorText = await tossResponse.text();
-        console.error('❌ Toss Error:', errorText);
+        console.error('❌ Toss Error (Decrypted):', decryptedResponse);
 
-        let errDetail = errorText;
-        try {
-          const json = JSON.parse(errorText);
-          errDetail = json.error?.message || errorText;
-        } catch (e) { }
+        const errDetail = decryptedResponse.error?.message || JSON.stringify(decryptedResponse);
 
-        // RETURN DEBUG INFO TO FRONTEND directly
         return NextResponse.json({
-          error: `Toss 500 Error: ${errDetail}`,
+          error: `Toss API Error: ${errDetail}`,
           details: {
             tossStatus: tossResponse.status,
-            tossMessage: errorText,
-            sentPayload: debugPayload // User can see this in Browser Console!
+            tossMessage: decryptedResponse,
+            sentPayload: debugPayload
           }
         }, { status: 400 });
       }
 
-      const tossResult = await tossResponse.json();
-      console.log('✅ Toss Success:', tossResult);
+      console.log('✅ Toss Success:', decryptedResponse);
       tossSellerId = userId;
-      tossStatus = 'COMPLETED';
+      if (decryptedResponse.entityBody?.status) {
+        tossStatus = decryptedResponse.entityBody.status;
+      } else if (decryptedResponse.status) {
+        tossStatus = decryptedResponse.status;
+      } else {
+        tossStatus = 'COMPLETED';
+      }
     } else {
       console.warn('⚠️ No Toss Keys found. Skipping Toss API.');
     }
@@ -209,7 +227,8 @@ export async function POST(request: NextRequest) {
         businessCategory, businessType2: businessType2 || '', businessAddress,
         contactName, contactPhone, contactEmail, bankName, accountNumber, accountHolder,
         platformUrl, mobileAppUrl, step: 3, isCompleted: true,
-        sellerId: tossSellerId, tossStatus: tossStatus
+        sellerId: tossSellerId, tossStatus: tossStatus,
+        updatedAt: new Date()
       }).where(eq(businessRegistrations.userId, userId));
     } else {
       await db.insert(businessRegistrations).values({
@@ -218,18 +237,18 @@ export async function POST(request: NextRequest) {
         businessCategory, businessType2: businessType2 || '', businessAddress,
         contactName, contactPhone, contactEmail, bankName, accountNumber, accountHolder,
         platformUrl, mobileAppUrl, step: 3, isCompleted: true,
-        sellerId: tossSellerId, tossStatus: 'PENDING' // or tossStatus logic
+        sellerId: tossSellerId, tossStatus: tossStatus
       });
     }
 
     console.log('[API] Success! Returning 200 OK.');
-    return NextResponse.json({ success: true, sellerId: tossSellerId });
+    return NextResponse.json({ success: true, sellerId: tossSellerId, status: tossStatus });
 
   } catch (error: any) {
     console.error('[API] Critical Error:', error);
-
     return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
   }
+
 }
 
 export async function GET() {

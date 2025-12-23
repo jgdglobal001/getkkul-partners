@@ -62,12 +62,10 @@ export default function Step2Page() {
         ...prev,
         ...parsed
       }));
-      // 이미 인증된 상태라고 가정해야 할까? 
-      // 보통 수정하러 돌아온 것이므로 인증 상태는 초기화하는 게 안전하거나, 
-      // 인증된 값(Business Number 등)이 변경되지 않았다면 유지해야 함.
-      // 여기서는 일단 인증 상태는 풀어두고 다시 인증하게 하거나, 
-      // 아니면 'isBusinessVerified'도 저장했어야 함.
-      // 간단히 값만 복원.
+    }
+    const savedVerified = sessionStorage.getItem('isBusinessVerified');
+    if (savedVerified === 'true') {
+      setIsBusinessVerified(true);
     }
   }, [session, router]);
 
@@ -107,6 +105,7 @@ export default function Step2Page() {
 
       if (result.success) {
         setIsBusinessVerified(true);
+        sessionStorage.setItem('isBusinessVerified', 'true');
         alert('✓ 사업자 정보가 확인되었습니다!');
       } else {
         setIsBusinessVerified(false);
