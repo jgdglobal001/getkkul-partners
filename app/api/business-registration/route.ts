@@ -280,6 +280,43 @@ export async function POST(request: NextRequest) {
 
 }
 
-export async function GET() {
-  return NextResponse.json({ message: 'Business Registration API is active' }, { status: 200 });
+export async function GET(request: NextRequest) {
+  console.log('[API] Business Registration GET Request Received');
+
+  try {
+    // JWT 토큰 검증
+    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+    const token = await getToken({
+      req: request,
+      secret: secret,
+      secureCookie: process.env.NODE_ENV === 'production'
+    });
+
+    if (!token?.sub) {
+      console.log('[API] GET - Token verification failed');
+      return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
+    }
+
+    const userId = token.sub;
+    console.log('[API] GET - Authenticated User:', userId);
+
+    // DB에서 사용자의 비즈니스 등록 정보 조회
+    const existing = await db
+      .select()
+      .from(businessRegistrations)
+      .where(eq(businessRegistrations.userId, userId))
+      .limit(1);
+
+    if (existing[0]) {
+      console.log('[API] GET - Found business registration for user');
+      return NextResponse.json(existing[0], { status: 200 });
+    } else {
+      console.log('[API] GET - No business registration found');
+      return NextResponse.json({ message: 'No registration found' }, { status: 404 });
+    }
+
+  } catch (error: any) {
+    console.error('[API] GET Error:', error);
+    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
+  }
 }
