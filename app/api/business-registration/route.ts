@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
     let tossSellerId = null;
     let tossStatus = 'PENDING';
 
-    const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY;
-    const securityKey = process.env.TOSS_PAYMENTS_SECURITY_KEY;
+    const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY?.trim();
+    const securityKey = process.env.TOSS_PAYMENTS_SECURITY_KEY?.trim();
 
     if (secretKey && securityKey) {
       const bankCode = BANK_CODES[bankName];
@@ -127,16 +127,21 @@ export async function POST(request: NextRequest) {
         };
       }
 
-      // Encrypt with btoa/TextEncoder (Edge Safe)
+      // Encrypt with jose/TextEncoder (Edge Safe)
       console.log('[API] Encrypting payload...');
       const keyStr = securityKey as string;
-      const isHex = /^[0-9A-Fa-f]+$/.test(keyStr);
-      const key = isHex ? Buffer.from(keyStr, 'hex') : Buffer.from(keyStr, 'utf-8');
+
+      // Hex 키를 Uint8Array로 변환 (Buffer 의존성 제거)
+      const key = new Uint8Array(
+        keyStr.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+      );
 
       // iat: ISO 8601 형식 (yyyy-MM-dd'T'HH:mm:ss+09:00)
+      // Edge Runtime에서 안정적인 시간 생성을 위해 수동 계산
       const now = new Date();
-      const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-      const iat = kstDate.toISOString().split('.')[0] + '+09:00';
+      const kstOffset = 9 * 60 * 60 * 1000;
+      const kstTime = new Date(now.getTime() + kstOffset);
+      const iat = kstTime.toISOString().replace(/\.\d+Z$/, '+09:00');
 
       const encryptedBody = await new jose.CompactEncrypt(
         new TextEncoder().encode(JSON.stringify(payload))
@@ -164,7 +169,7 @@ export async function POST(request: NextRequest) {
         headers: {
           'Authorization': `Basic ${basicAuth}`,
           'Content-Type': 'application/json',
-          'TossPayments-api-security-mode': 'ENCRYPTION'
+          'TossPayments-Api-Security-Mode': 'ENCRYPTION'
         },
         body: JSON.stringify({ body: encryptedBody })
       });

@@ -122,7 +122,7 @@ export default function Step3Page() {
       let msg = error.message || '사업자 등록 정보 저장 중 오류가 발생했습니다.';
 
       if (error.details) {
-        msg += `\n\n[디버그 정보]\nToss Status: ${error.details.tossStatus}\nMessage: ${error.details.tossMessage}`;
+        msg += `\n\n[디버그 정보]\nToss Status: ${error.details.tossStatus}\nMessage: ${typeof error.details.tossMessage === 'object' ? JSON.stringify(error.details.tossMessage, null, 2) : error.details.tossMessage}`;
         if (error.details.sentPayload) {
           msg += `\n\nPayload:\n${JSON.stringify(error.details.sentPayload, null, 2)}`;
         }
