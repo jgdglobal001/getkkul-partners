@@ -6,6 +6,23 @@ import { eq } from "drizzle-orm";
 import Kakao from "@/lib/auth/providers/kakao";
 import Naver from "@/lib/auth/providers/naver";
 
+// Cloudflare Edge Runtime cold start 시 환경변수가 undefined일 수 있으므로 fallback 처리
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID || "";
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET || "";
+const KAKAO_CLIENT_ID = process.env.KAKAO_CLIENT_ID || process.env.AUTH_KAKAO_ID || "";
+const KAKAO_CLIENT_SECRET = process.env.KAKAO_CLIENT_SECRET || process.env.AUTH_KAKAO_SECRET || "";
+const NAVER_CLIENT_ID = process.env.NAVER_CLIENT_ID || process.env.AUTH_NAVER_ID || "";
+const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET || process.env.AUTH_NAVER_SECRET || "";
+
+// 환경변수 로딩 상태 로깅 (디버그용)
+if (typeof globalThis !== 'undefined') {
+  console.log('[Auth Config] Environment variables loaded:', {
+    GOOGLE_CLIENT_ID: GOOGLE_CLIENT_ID ? 'SET' : 'MISSING',
+    KAKAO_CLIENT_ID: KAKAO_CLIENT_ID ? 'SET' : 'MISSING',
+    NAVER_CLIENT_ID: NAVER_CLIENT_ID ? 'SET' : 'MISSING',
+  });
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Cloudflare Pages에서 호스트 신뢰 설정 필요
   trustHost: true,
@@ -13,8 +30,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: GOOGLE_CLIENT_ID,
+      clientSecret: GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
           prompt: "consent",
@@ -25,12 +42,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
     Kakao({
-      clientId: process.env.KAKAO_CLIENT_ID!,
-      clientSecret: process.env.KAKAO_CLIENT_SECRET!,
+      clientId: KAKAO_CLIENT_ID,
+      clientSecret: KAKAO_CLIENT_SECRET,
     }),
     Naver({
-      clientId: process.env.NAVER_CLIENT_ID!,
-      clientSecret: process.env.NAVER_CLIENT_SECRET!,
+      clientId: NAVER_CLIENT_ID,
+      clientSecret: NAVER_CLIENT_SECRET,
     }),
   ],
   pages: {

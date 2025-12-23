@@ -1,8 +1,8 @@
 import { handlers } from "@/auth";
 import { NextRequest } from "next/server";
 
-// Cloudflare Pages에서 Edge Runtime cold start 시 환경변수 로딩 문제로 Node.js Runtime 사용
-// export const runtime = 'edge';
+// Cloudflare Pages는 Edge Runtime만 지원
+export const runtime = 'edge';
 
 const { GET: originalGET, POST: originalPOST } = handlers;
 
