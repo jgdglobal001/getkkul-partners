@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { businessRegistrations } from '@/db/schema';
+import { businessRegistrations, users, accounts } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 export const runtime = 'edge';
@@ -115,17 +115,50 @@ export async function POST(request: NextRequest) {
         console.log('🔍 DB 중복 확인 중... 사업자번호:', formattedBusinessNumber);
 
         const existingRegistration = await db
-          .select()
+          .select({
+            id: businessRegistrations.id,
+            userId: businessRegistrations.userId,
+            user: {
+              email: users.email,
+            },
+            account: {
+              provider: accounts.provider,
+            }
+          })
           .from(businessRegistrations)
+          .leftJoin(users, eq(businessRegistrations.userId, users.id))
+          .leftJoin(accounts, eq(businessRegistrations.userId, accounts.userId))
           .where(eq(businessRegistrations.businessNumber, formattedBusinessNumber))
           .limit(1);
 
         if (existingRegistration[0]) {
           console.log('❌ 이미 등록된 사업자번호:', formattedBusinessNumber);
+
+          const reg = existingRegistration[0];
+          const rawEmail = reg.user?.email || '';
+          let maskedEmail = '';
+          if (rawEmail) {
+            const [id, domain] = rawEmail.split('@');
+            maskedEmail = id.substring(0, 1) + '*'.repeat(id.length - 1) + '@' + domain;
+          }
+
+          const providerMap: Record<string, string> = {
+            'google': '구글',
+            'naver': '네이버',
+            'kakao': '카카오'
+          };
+          const providerName = providerMap[reg.account?.provider || ''] || reg.account?.provider || '소셜';
+
           return NextResponse.json(
             {
               success: false,
-              message: '이미 등록된 사업자번호입니다. 다른 계정으로 가입되어 있습니다.',
+              isAlreadyRegistered: true,
+              message: `기존에 등록된 사업자등록 정보입니다! 다시 확인하시어 로그인을 해주세요! \n\n기존 가입 계정: ${providerName} (${maskedEmail})`,
+              existingAccount: {
+                provider: reg.account?.provider,
+                providerName: providerName,
+                maskedEmail: maskedEmail
+              }
             },
             { status: 400 }
           );

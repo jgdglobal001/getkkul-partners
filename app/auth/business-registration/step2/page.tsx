@@ -114,7 +114,13 @@ export default function Step2Page() {
         alert('✓ 사업자 정보가 확인되었습니다!');
       } else {
         setIsBusinessVerified(false);
-        alert('✗ ' + (result.message || '사업자 정보가 일치하지 않습니다.'));
+        if (result.isAlreadyRegistered) {
+          // 중복 가입 안내
+          const msg = `기존에 등록된 사업자등록 정보입니다! 다시 확인하시어 로그인을 해주세요!\n\n가입된 계정: ${result.existingAccount?.providerName} (${result.existingAccount?.maskedEmail})`;
+          alert(msg);
+        } else {
+          alert('✗ ' + (result.message || '사업자 정보가 일치하지 않습니다.'));
+        }
       }
     } catch (error) {
       console.error('사업자 정보 검증 오류:', error);

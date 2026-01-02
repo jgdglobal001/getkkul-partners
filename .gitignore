@@ -42,3 +42,7 @@ next-env.d.ts
 
 # local backup
 local_env_backup.txt
+
+# debug scripts & temp env
+*.mjs
+temp_run.env
