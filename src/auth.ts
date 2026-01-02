@@ -1,10 +1,10 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import Kakao from "@/lib/auth/providers/kakao";
+import Naver from "@/lib/auth/providers/naver";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import Kakao from "@/lib/auth/providers/kakao";
-import Naver from "@/lib/auth/providers/naver";
 
 // NextAuth v5 (Auth.js) 설정
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -38,24 +38,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/auth/signin",
     error: "/auth/error",
   },
-  // 프로덕션에서도 디버그 모드 활성화 (임시)
+  // 디버그 모드 활성화 (Cloudflare 로그에서 상세 내용 확인용)
   debug: true,
   session: {
     strategy: "jwt",
   },
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account }: { user: any; account?: any }) {
       if (account?.provider === "google" || account?.provider === "kakao" || account?.provider === "naver") {
         try {
           console.log(`[OAuth SignIn] Provider: ${account?.provider}`);
 
-          if (!user.email && !account.providerAccountId) {
-            console.error("[OAuth SignIn] No email and no providerAccountId found");
-            return true; // 에러로 차단하기보다 일단 통과시킨 후 세션에서 처리 시도
-          }
-
           const userEmail = user.email || `${account.provider}_${account.providerAccountId}@oauth.local`;
-          console.log(`[OAuth SignIn] Syncing user: ${userEmail}`);
+          console.log(`[OAuth SignIn] Syncing user to DB: ${userEmail}`);
 
           try {
             // 1. 기존 사용자 조회
@@ -86,13 +81,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           console.log(`[OAuth SignIn] Completed for: ${userEmail}`);
         } catch (error) {
-          // 최상위 수준에서도 에러를 삼키고 true 반환하여 AccessDenied 방지
-          console.error("[OAuth SignIn] Critical Error in callback:", error);
+          console.error("[OAuth SignIn] Fatal Error:", error);
         }
       }
       return true;
     },
-    async jwt({ token, user }) {
+    async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same origin
+      else if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
+    },
+    async jwt({ token, user }: { token: any; user: any }) {
       if (user) {
         token.id = user.id || token.sub || `user_${Date.now()}`;
         token.role = "user";
@@ -117,7 +118,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) {
       if (token && session.user) {
         session.user.id = (token.id as string) || (token.sub as string);
         session.user.email = token.email as string;

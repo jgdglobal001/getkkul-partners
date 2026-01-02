@@ -34,8 +34,8 @@ export default function Naver<P extends NaverProfile>(
     token: "https://nid.naver.com/oauth2.0/token",
     userinfo: {
       url: "https://openapi.naver.com/v1/nid/me",
-      async request({ tokens }: { tokens: { access_token?: string } }) {
-        const response = await fetch("https://openapi.naver.com/v1/nid/me", {
+      async request({ tokens, provider }: { tokens: any; provider: any }) {
+        const response = await fetch(provider.userinfo?.url as string, {
           headers: {
             Authorization: `Bearer ${tokens.access_token}`,
             "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",

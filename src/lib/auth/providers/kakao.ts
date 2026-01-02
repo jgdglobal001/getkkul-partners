@@ -37,16 +37,15 @@ export default function Kakao<P extends KakaoProfile>(
     authorization: {
       url: "https://kauth.kakao.com/oauth/authorize",
       params: {
-        scope: "account_email",
-        fallback_scope: "profile_nickname",
+        scope: "profile_nickname profile_image account_email",
         response_type: "code",
       },
     },
     token: "https://kauth.kakao.com/oauth/token",
     userinfo: {
       url: "https://kapi.kakao.com/v2/user/me",
-      async request({ tokens }: { tokens: { access_token?: string } }) {
-        const response = await fetch("https://kapi.kakao.com/v2/user/me", {
+      async request({ tokens, provider }: { tokens: any; provider: any }) {
+        const response = await fetch(provider.userinfo?.url as string, {
           headers: {
             Authorization: `Bearer ${tokens.access_token}`,
             "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
@@ -60,8 +59,11 @@ export default function Kakao<P extends KakaoProfile>(
         id: profile.id.toString(),
         name: profile.kakao_account?.profile?.nickname || profile.properties?.nickname || null,
         email: profile.kakao_account?.email || null,
-        image: null, // 프로필 사진 제외
+        image: profile.kakao_account?.profile?.profile_image_url || profile.properties?.profile_image || null,
       };
+    },
+    client: {
+      token_endpoint_auth_method: "client_secret_post",
     },
     ...options,
   } as OAuthConfig<P>;
