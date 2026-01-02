@@ -47,12 +47,12 @@ export default function Naver<P extends NaverProfile>(
     profile(profile: P) {
       return {
         id: profile.response.id,
-        name: profile.response.name || profile.response.nickname,
+        name: profile.response.name || profile.response.nickname || null,
         email: profile.response.email || null,
         image: profile.response.profile_image || null,
       };
     },
-    options,
-  };
+    ...options,
+  } as OAuthConfig<P>;
 }
 

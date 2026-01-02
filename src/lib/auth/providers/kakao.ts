@@ -58,12 +58,12 @@ export default function Kakao<P extends KakaoProfile>(
     profile(profile: P) {
       return {
         id: profile.id.toString(),
-        name: profile.kakao_account.profile.nickname || profile.properties.nickname || null,
-        email: profile.kakao_account.email || null,
+        name: profile.kakao_account?.profile?.nickname || profile.properties?.nickname || null,
+        email: profile.kakao_account?.email || null,
         image: null, // 프로필 사진 제외
       };
     },
-    options,
-  };
+    ...options,
+  } as OAuthConfig<P>;
 }
 
