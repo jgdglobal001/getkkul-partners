@@ -33,7 +33,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* 고객 지원 */}
           <div>
             <h3 className="text-lg font-bold mb-4">고객 지원</h3>
             <ul className="space-y-2 text-sm">
@@ -48,8 +47,18 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition">
+                <a href="/policies?tab=service" className="text-gray-400 hover:text-white transition">
                   이용약관
+                </a>
+              </li>
+              <li>
+                <a href="/policies?tab=privacy" className="text-gray-400 hover:text-white transition">
+                  개인정보처리방침
+                </a>
+              </li>
+              <li>
+                <a href="/policies?tab=operating" className="text-gray-400 hover:text-white transition">
+                  운영정책
                 </a>
               </li>
             </ul>

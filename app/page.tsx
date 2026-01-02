@@ -374,11 +374,11 @@ export default function Home() {
           </div>
           <div className="border-t border-gray-800 pt-8">
             <div className="mb-6 text-gray-400 text-sm space-x-4 text-center">
-              <a href="#" className="hover:text-white">이용약관</a>
+              <a href="/policies?tab=service" className="hover:text-white">이용약관</a>
               <span>|</span>
-              <a href="#" className="hover:text-white">개인정보처리방침</a>
+              <a href="/policies?tab=privacy" className="hover:text-white">개인정보처리방침</a>
               <span>|</span>
-              <a href="#" className="hover:text-white">이용정책</a>
+              <a href="/policies?tab=operating" className="hover:text-white">이용정책</a>
             </div>
             <div className="text-center text-gray-400 text-sm">
               <p>&copy; 2025 겟꿀 파트너스. All rights reserved.</p>
