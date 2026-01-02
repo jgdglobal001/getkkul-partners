@@ -37,7 +37,7 @@ export default function Kakao<P extends KakaoProfile>(
     authorization: {
       url: "https://kauth.kakao.com/oauth/authorize",
       params: {
-        scope: "name account_email",
+        scope: "account_email",
         fallback_scope: "profile_nickname",
         response_type: "code",
       },
@@ -58,7 +58,7 @@ export default function Kakao<P extends KakaoProfile>(
     profile(profile: P) {
       return {
         id: profile.id.toString(),
-        name: profile.kakao_account.name || profile.kakao_account.profile.nickname || profile.properties.nickname,
+        name: profile.kakao_account.profile.nickname || profile.properties.nickname || null,
         email: profile.kakao_account.email || null,
         image: null, // 프로필 사진 제외
       };
