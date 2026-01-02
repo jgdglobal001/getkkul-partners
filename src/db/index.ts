@@ -28,14 +28,19 @@ export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(target, prop) {
     // 처음 접근 시 실제 DB 연결 생성
     if (!_db) {
-      console.log('[DB] Initializing database connection...');
+      console.log('[DB] Connecting to database...');
       try {
         const url = getDatabaseUrl();
+
+        if (url.includes('dummy')) {
+          console.warn('[DB] WARNING: Using dummy URL because DATABASE_URL is not set.');
+        }
+
         const sql = neon(url);
         _db = drizzle(sql, { schema });
-        console.log('[DB] Database connection initialized successfully');
+        console.log('[DB] Database driver initialized.');
       } catch (error) {
-        console.error('[DB] Error initializing database:', error);
+        console.error('[DB] DATABASE INITIALIZATION FAILED:', error);
         throw error;
       }
     }

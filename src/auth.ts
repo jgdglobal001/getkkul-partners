@@ -55,15 +55,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           const userEmail = user.email || `${account.provider}_${account.providerAccountId}@oauth.local`;
+          console.log(`[OAuth SignIn] Syncing user: ${userEmail}`);
 
-          // DB 작업 시도
           try {
-            console.log(`[OAuth SignIn] Syncing user to DB: ${userEmail}`);
+            // 1. 기존 사용자 조회
             const existingUsers = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
-            let targetUser = existingUsers[0];
+            let targetUser = existingUsers[0] || null;
 
+            // 2. 새 사용자 생성
             if (!targetUser) {
-              console.log(`[OAuth SignIn] Creating new user record...`);
+              console.log(`[OAuth SignIn] Creating user in DB...`);
               const newUsers = await db.insert(users).values({
                 name: user.name || (user.email ? "" : `${account.provider} User`),
                 email: userEmail,
@@ -77,10 +78,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (targetUser) {
               user.id = targetUser.id;
               if (!user.email) user.email = userEmail;
+              console.log(`[OAuth SignIn] DB Sync Success: ${targetUser.id}`);
             }
           } catch (dbError) {
-            // DB 에러가 발생하더라도 로그인은 허용 (AccessDenied 방지)
-            console.error("[OAuth SignIn] DB Sync Error (skipping):", dbError);
+            console.error("[OAuth SignIn] DB SYNC FAILURE:", dbError);
           }
 
           console.log(`[OAuth SignIn] Completed for: ${userEmail}`);
