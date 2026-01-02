@@ -20,7 +20,15 @@ export default function Step1Page() {
   useEffect(() => {
     if (!session?.user?.id) {
       router.push('/auth/signin');
+      return;
     }
+
+    // Step1 진입 시 이전 등록 과정의 모든 데이터 초기화
+    // (이전 시도가 실패했을 수 있으므로 처음부터 다시 시작)
+    sessionStorage.removeItem('businessType');
+    sessionStorage.removeItem('agreements');
+    sessionStorage.removeItem('step2Data');
+    sessionStorage.removeItem('isBusinessVerified');
   }, [session, router]);
 
   const handleAgreementChange = (key: keyof typeof agreements) => {

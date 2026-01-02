@@ -110,10 +110,11 @@ export default function Step3Page() {
         sessionStorage.setItem('businessName', step2Data.businessName);
       }
 
-      // 세션 스토리지 정리
+      // 세션 스토리지 정리 (성공 시 모든 데이터 삭제)
       sessionStorage.removeItem('businessType');
       sessionStorage.removeItem('agreements');
       sessionStorage.removeItem('step2Data');
+      sessionStorage.removeItem('isBusinessVerified'); // 사업자 확인 상태도 삭제
 
       // 완료 페이지로 이동
       router.push('/auth/business-registration/complete');
@@ -129,6 +130,10 @@ export default function Step3Page() {
       } else if (msg.includes('Status: 500')) {
         msg += '\n\n[팁] 은행, 계좌번호, 예금주명이 정확한지 확인해주세요.\n(특히 예금주명이 은행 앱에서 잘려서 표시되는지 확인해보세요!)';
       }
+
+      // 실패 시 사업자 확인 상태 초기화 (다시 확인받아야 함)
+      sessionStorage.removeItem('isBusinessVerified');
+
       setDebugError(msg);
       alert("오류가 발생했습니다. 하단의 붉은 박스 내용을 확인해주세요.");
     }
