@@ -37,7 +37,7 @@ export default function Kakao<P extends KakaoProfile>(
     authorization: {
       url: "https://kauth.kakao.com/oauth/authorize",
       params: {
-        scope: "profile_nickname profile_image account_email",
+        scope: "account_email",
         response_type: "code",
       },
     },
