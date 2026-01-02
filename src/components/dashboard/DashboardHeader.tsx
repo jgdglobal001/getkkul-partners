@@ -171,25 +171,27 @@ export default function DashboardHeader() {
                 </button>
 
                 {/* 드롭다운 메뉴 */}
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 hidden group-hover:block">
-                  <div className="px-4 py-3 border-b border-gray-100 lg:hidden">
-                    <p className="text-sm font-medium text-gray-900">{session.user.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
-                  </div>
+                <div className="absolute right-0 top-full pt-2 w-48 hidden group-hover:block z-50">
+                  <div className="bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                    <div className="px-4 py-3 border-b border-gray-100 lg:hidden">
+                      <p className="text-sm font-medium text-gray-900">{session.user.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
+                    </div>
 
-                  <Link href="/dashboard/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                    내 정보 수정
-                  </Link>
-                  <Link href="/dashboard/settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                    환경설정
-                  </Link>
-                  <div className="border-t border-gray-100 my-1"></div>
-                  <button
-                    onClick={() => signOut({ callbackUrl: '/' })}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    로그아웃
-                  </button>
+                    <Link href="/dashboard/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                      내 정보 수정
+                    </Link>
+                    <Link href="/dashboard/settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                      환경설정
+                    </Link>
+                    <div className="border-t border-gray-100 my-1"></div>
+                    <button
+                      onClick={() => signOut({ callbackUrl: '/' })}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      로그아웃
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
