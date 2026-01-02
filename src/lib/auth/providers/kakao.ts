@@ -11,6 +11,8 @@ export interface KakaoProfile {
   kakao_account: {
     profile_nickname_needs_agreement: boolean;
     profile_image_needs_agreement: boolean;
+    name_needs_agreement?: boolean;
+    name?: string;
     profile: {
       nickname: string;
       thumbnail_image_url?: string;
@@ -35,7 +37,8 @@ export default function Kakao<P extends KakaoProfile>(
     authorization: {
       url: "https://kauth.kakao.com/oauth/authorize",
       params: {
-        scope: "profile_nickname profile_image account_email",
+        scope: "name account_email",
+        fallback_scope: "profile_nickname",
         response_type: "code",
       },
     },
@@ -55,9 +58,9 @@ export default function Kakao<P extends KakaoProfile>(
     profile(profile: P) {
       return {
         id: profile.id.toString(),
-        name: profile.kakao_account.profile.nickname || profile.properties.nickname,
+        name: profile.kakao_account.name || profile.kakao_account.profile.nickname || profile.properties.nickname,
         email: profile.kakao_account.email || null,
-        image: profile.kakao_account.profile.profile_image_url || profile.properties.profile_image || null,
+        image: null, // 프로필 사진 제외
       };
     },
     options,
