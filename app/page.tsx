@@ -372,11 +372,34 @@ export default function Home() {
               </div>
             </div>
           </div>
+          {/* 회사 정보 */}
           <div className="border-t border-gray-800 pt-8">
+            <div className="text-gray-400 text-sm mb-6">
+              <p className="mb-2">
+                <span className="font-semibold text-gray-300">주식회사 제이지디글로벌</span>
+                <span className="mx-2">|</span>
+                대표자: 전은찬
+                <span className="mx-2">|</span>
+                개인정보보호책임자: 백인희
+              </p>
+              <p className="mb-2">
+                사업자등록번호: 308-86-03448
+                <span className="mx-2">|</span>
+                통신판매신고번호: 제 2025-인천연수구-2051 호
+              </p>
+              <p className="mb-2">
+                주소: 인천광역시 연수구 송도과학로 32, 엠동 2201호(송도동, 송도테크노파크 IT센터)
+              </p>
+              <p>
+                고객센터: <a href="tel:010-7218-2858" className="hover:text-white">010-7218-2858</a>
+                <span className="mx-2">|</span>
+                이메일: <a href="mailto:jgdglobal@kakao.com" className="hover:text-white">jgdglobal@kakao.com</a>
+              </p>
+            </div>
             <div className="mb-6 text-gray-400 text-sm space-x-4 text-center">
               <a href="/policies?tab=service" className="hover:text-white">이용약관</a>
               <span>|</span>
-              <a href="/policies?tab=privacy" className="hover:text-white">개인정보처리방침</a>
+              <a href="/policies?tab=privacy" className="hover:text-white font-semibold">개인정보처리방침</a>
               <span>|</span>
               <a href="/policies?tab=operating" className="hover:text-white">이용정책</a>
             </div>

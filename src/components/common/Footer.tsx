@@ -37,12 +37,12 @@ export default function Footer() {
             <h3 className="text-lg font-bold mb-4">고객 지원</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition">
+                <a href="/dashboard/support/faq" className="text-gray-400 hover:text-white transition">
                   FAQ
                 </a>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition">
+                <a href="/dashboard/support/contact" className="text-gray-400 hover:text-white transition">
                   문의하기
                 </a>
               </li>
@@ -52,7 +52,7 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="/policies?tab=privacy" className="text-gray-400 hover:text-white transition">
+                <a href="/policies?tab=privacy" className="text-gray-400 hover:text-white transition font-semibold">
                   개인정보처리방침
                 </a>
               </li>
@@ -65,9 +65,29 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* 저작권 */}
-        <div className="border-t border-gray-700 mt-8 pt-8 text-center text-sm text-gray-400">
-          <p>&copy; 2024 겟꿀 파트너스. All rights reserved.</p>
+        {/* 회사 정보 */}
+        <div className="border-t border-gray-700 mt-8 pt-6 text-sm text-gray-400">
+          <p className="mb-2">
+            <span className="font-semibold text-gray-300">주식회사 제이지디글로벌</span>
+            <span className="mx-2">|</span>
+            대표자: 전은찬
+            <span className="mx-2">|</span>
+            개인정보보호책임자: 백인희
+          </p>
+          <p className="mb-2">
+            사업자등록번호: 308-86-03448
+            <span className="mx-2">|</span>
+            통신판매신고번호: 제 2025-인천연수구-2051 호
+          </p>
+          <p className="mb-2">
+            주소: 인천광역시 연수구 송도과학로 32, 엠동 2201호(송도동, 송도테크노파크 IT센터)
+          </p>
+          <p className="mb-4">
+            고객센터: <a href="tel:010-7218-2858" className="hover:text-white">010-7218-2858</a>
+            <span className="mx-2">|</span>
+            이메일: <a href="mailto:jgdglobal@kakao.com" className="hover:text-white">jgdglobal@kakao.com</a>
+          </p>
+          <p className="text-center">&copy; 2025 겟꿀 파트너스. All rights reserved.</p>
         </div>
       </div>
     </footer>
