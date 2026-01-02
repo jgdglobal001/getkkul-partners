@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/db';
+import { businessRegistrations } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const runtime = 'edge';
 
@@ -105,7 +108,30 @@ export async function POST(request: NextRequest) {
 
       // valid: "01" = 확인됨, "02" = 확인할 수 없음
       if (result.valid === '01') {
-        console.log('✅ 사업자 정보 검증 성공');
+        console.log('✅ 사업자 정보 검증 성공 - 국세청 확인 완료');
+
+        // 우리 DB에 이미 등록된 사업자번호인지 확인
+        const formattedBusinessNumber = `${businessNumber.slice(0, 3)}-${businessNumber.slice(3, 5)}-${businessNumber.slice(5)}`;
+        console.log('🔍 DB 중복 확인 중... 사업자번호:', formattedBusinessNumber);
+
+        const existingRegistration = await db
+          .select()
+          .from(businessRegistrations)
+          .where(eq(businessRegistrations.businessNumber, formattedBusinessNumber))
+          .limit(1);
+
+        if (existingRegistration[0]) {
+          console.log('❌ 이미 등록된 사업자번호:', formattedBusinessNumber);
+          return NextResponse.json(
+            {
+              success: false,
+              message: '이미 등록된 사업자번호입니다. 다른 계정으로 가입되어 있습니다.',
+            },
+            { status: 400 }
+          );
+        }
+
+        console.log('✅ DB 중복 없음 - 등록 가능');
         return NextResponse.json({
           success: true,
           message: '사업자 정보가 확인되었습니다.',
