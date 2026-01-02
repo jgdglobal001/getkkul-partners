@@ -29,6 +29,7 @@ export default function Step2Page() {
   });
   const [isBusinessVerified, setIsBusinessVerified] = useState(false);
   const [verifyLoading, setVerifyLoading] = useState(false);
+  const [taxInvoiceProvided, setTaxInvoiceProvided] = useState<boolean | null>(null);
 
   // 필수 항목 입력 여부 확인
   const isVerifyButtonEnabled =
@@ -62,6 +63,10 @@ export default function Step2Page() {
         ...prev,
         ...parsed
       }));
+      // 세금계산서 제공 여부도 불러오기
+      if (parsed.taxInvoiceProvided !== undefined) {
+        setTaxInvoiceProvided(parsed.taxInvoiceProvided);
+      }
     }
     const savedVerified = sessionStorage.getItem('isBusinessVerified');
     if (savedVerified === 'true') {
@@ -137,8 +142,17 @@ export default function Step2Page() {
       return;
     }
 
+    // 개인사업자일 경우 세금계산서 제공 여부 선택 확인
+    if (businessType === '개인사업자' && taxInvoiceProvided === null) {
+      alert('세금계산서 제공 여부를 선택해주세요.');
+      return;
+    }
+
     // 2단계 데이터를 세션 스토리지에 저장
-    sessionStorage.setItem('step2Data', JSON.stringify(formData));
+    sessionStorage.setItem('step2Data', JSON.stringify({
+      ...formData,
+      taxInvoiceProvided: businessType === '개인사업자' ? taxInvoiceProvided : null,
+    }));
 
     router.push('/auth/business-registration/step3');
   };
@@ -180,6 +194,35 @@ export default function Step2Page() {
             <div>
               <h2 className="text-lg font-bold mb-4">결제자 정보</h2>
             </div>
+
+            {/* 세금계산서 제공 여부 - 개인사업자만 표시 */}
+            {businessType === '개인사업자' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <label className="block text-sm font-bold mb-3">세금계산서 제공 여부 *</label>
+                <div className="space-y-2">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="taxInvoice"
+                      checked={taxInvoiceProvided === true}
+                      onChange={() => setTaxInvoiceProvided(true)}
+                      className="w-4 h-4"
+                    />
+                    <span className="ml-2 text-sm">세금계산서 제공 (일반과세자)</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="taxInvoice"
+                      checked={taxInvoiceProvided === false}
+                      onChange={() => setTaxInvoiceProvided(false)}
+                      className="w-4 h-4"
+                    />
+                    <span className="ml-2 text-sm">세금계산서 미제공 (간이/면세사업자)</span>
+                  </label>
+                </div>
+              </div>
+            )}
 
             {/* 사업자명 */}
             <div>

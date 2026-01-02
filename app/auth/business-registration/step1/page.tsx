@@ -116,19 +116,10 @@ export default function Step1Page() {
                 onChange={(e) => setBusinessType(e.target.value)}
                 className="w-5 h-5"
               />
-              <span className="ml-3 font-medium">개인</span>
-            </label>
-
-            <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition">
-              <input
-                type="radio"
-                name="businessType"
-                value="법인/개인"
-                checked={businessType === '법인/개인'}
-                onChange={(e) => setBusinessType(e.target.value)}
-                className="w-5 h-5"
-              />
-              <span className="ml-3 font-medium">법인/개인 사업자 (세금계산서 제공)</span>
+              <div className="ml-3">
+                <span className="font-medium">개인 (사업자 아님)</span>
+                <p className="text-sm text-gray-500">사업자등록증 없이 개인으로 활동</p>
+              </div>
             </label>
 
             <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition">
@@ -140,7 +131,25 @@ export default function Step1Page() {
                 onChange={(e) => setBusinessType(e.target.value)}
                 className="w-5 h-5"
               />
-              <span className="ml-3 font-medium">개인사업자 (세금계산서 미제공)</span>
+              <div className="ml-3">
+                <span className="font-medium">개인사업자 (세금계산서 제공/미제공)</span>
+                <p className="text-sm text-gray-500">개인 명의 사업자등록증 보유</p>
+              </div>
+            </label>
+
+            <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+              <input
+                type="radio"
+                name="businessType"
+                value="법인"
+                checked={businessType === '법인'}
+                onChange={(e) => setBusinessType(e.target.value)}
+                className="w-5 h-5"
+              />
+              <div className="ml-3">
+                <span className="font-medium">법인사업자 (세금계산서 제공)</span>
+                <p className="text-sm text-gray-500">법인 명의 사업자등록증 보유</p>
+              </div>
             </label>
           </div>
 
