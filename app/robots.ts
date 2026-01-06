@@ -15,6 +15,6 @@ export default function robots(): MetadataRoute.Robots {
                 '/embed/',
             ],
         },
-        sitemap: 'https://www.partners.getkkul.com/sitemap.xml',
+        sitemap: 'https://partners.getkkul.com/sitemap.xml',
     }
 }
