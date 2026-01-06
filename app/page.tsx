@@ -321,17 +321,15 @@ export default function Home() {
             <div>
               <h4 className="font-bold mb-4">회사</h4>
               <ul className="text-gray-400 text-sm space-y-2">
-                <li><a href="#" className="hover:text-white">회사소개</a></li>
-                <li><a href="#" className="hover:text-white">채용정보</a></li>
-                <li><a href="#" className="hover:text-white">뉴스</a></li>
+                <li><a href="/company-intro" className="hover:text-white">회사소개</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-bold mb-4">고객지원</h4>
               <ul className="text-gray-400 text-sm space-y-2">
-                <li><a href="#" className="hover:text-white">도움말</a></li>
-                <li><a href="#" className="hover:text-white">고객센터</a></li>
-                <li><a href="#" className="hover:text-white">FAQ</a></li>
+                <li><a href="/dashboard/support/faq" className="hover:text-white">FAQ</a></li>
+                <li><a href="/dashboard/support/contact" className="hover:text-white">문의하기</a></li>
+                <li><a href="/dashboard/notices" className="hover:text-white">공지사항</a></li>
               </ul>
             </div>
             <div>
