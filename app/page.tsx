@@ -336,22 +336,22 @@ export default function Home() {
             </div>
             <div>
               <h4 className="font-bold mb-4">팔로우</h4>
-              <div className="flex gap-4">
-                {/* 카카오톡 로고 */}
-                <a href="#" className="w-6 h-6 text-gray-400 hover:text-yellow-400 transition-colors" title="카카오">
+              <div className="flex gap-4 items-center">
+                {/* 카카오 K 로고 */}
+                <a href="#" className="w-5 h-5 text-gray-400 hover:text-yellow-400 transition-colors" title="카카오">
                   <svg fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 3C6.477 3 2 6.463 2 10.691c0 2.687 1.786 5.053 4.478 6.394-.143.525-.518 1.907-.594 2.2-.092.357.131.352.276.256.113-.075 1.8-1.222 2.534-1.717.422.063.858.096 1.306.096 5.523 0 10-3.463 10-7.229C20 6.463 17.523 3 12 3z"/>
+                    <path d="M3 3h4v7.5L12 3h5l-6.5 9L17 21h-5l-5-7.5V21H3V3z"/>
                   </svg>
                 </a>
                 {/* 네이버 로고 */}
-                <a href="#" className="w-6 h-6 text-gray-400 hover:text-green-500 transition-colors" title="네이버">
-                  <svg fill="currentColor" viewBox="0 0 24 24">
+                <a href="#" className="w-5 h-5 text-gray-400 hover:text-green-500 transition-colors" title="네이버">
+                  <svg fill="currentColor" viewBox="-2 -2 28 28">
                     <path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/>
                   </svg>
                 </a>
                 {/* TikTok 로고 */}
-                <a href="#" className="w-6 h-6 text-gray-400 hover:text-white transition-colors" title="TikTok">
-                  <svg fill="currentColor" viewBox="0 0 24 24">
+                <a href="#" className="w-5 h-5 text-gray-400 hover:text-white transition-colors" title="TikTok">
+                  <svg fill="currentColor" viewBox="-2 -2 28 28">
                     <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
                   </svg>
                 </a>
