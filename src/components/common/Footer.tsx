@@ -87,7 +87,7 @@ export default function Footer() {
             <span className="mx-2">|</span>
             이메일: <a href="mailto:jgdglobal@kakao.com" className="hover:text-white">jgdglobal@kakao.com</a>
           </p>
-          <p className="text-center">&copy; 2025 겟꿀 파트너스. All rights reserved.</p>
+          <p className="text-center">&copy; 2026 겟꿀 파트너스. All rights reserved.</p>
         </div>
       </div>
     </footer>

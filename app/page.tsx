@@ -404,7 +404,7 @@ export default function Home() {
               <a href="/policies?tab=operating" className="hover:text-white">이용정책</a>
             </div>
             <div className="text-center text-gray-400 text-sm">
-              <p>&copy; 2025 겟꿀 파트너스. All rights reserved.</p>
+              <p>&copy; 2026 겟꿀 파트너스. All rights reserved.</p>
             </div>
           </div>
         </div>
