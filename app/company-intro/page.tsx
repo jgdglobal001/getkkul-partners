@@ -28,7 +28,7 @@ export default function CompanyIntroPage() {
     setCurrentSlide(slideNumber);
   };
 
-  const slideImagePath = `/JGDGLOBAL & Getkkul 회사 소개서 최종/JGDGLOBAL & Getkkul 회사 소개서 최종_${currentSlide}.jpg`;
+  const slideImagePath = `/company-slides/slide_${currentSlide}.jpg`;
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
