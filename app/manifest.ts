@@ -1,5 +1,7 @@
 import { MetadataRoute } from 'next'
 
+export const runtime = 'edge';
+
 export default function manifest(): MetadataRoute.Manifest {
     return {
         name: '겟꿀 파트너스',
