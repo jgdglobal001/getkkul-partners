@@ -42,6 +42,10 @@ export const metadata: Metadata = {
   alternates: {
     canonical: '/',
   },
+  icons: {
+    icon: '/getkkul-partners-pabicon.png',
+    apple: '/getkkul-partners-pabicon.png',
+  },
 };
 
 export default function RootLayout({
@@ -51,6 +55,44 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": "겟꿀 파트너스",
+              "url": "https://partners.getkkul.com",
+              "logo": "https://partners.getkkul.com/getkkul-partners-logo.png",
+              "contactPoint": {
+                "@type": "ContactPoint",
+                "telephone": "+82-10-7218-2858",
+                "contactType": "customer service"
+              },
+              "sameAs": [
+                "https://www.getkkul.com"
+              ]
+            })
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              "name": "겟꿀 파트너스",
+              "url": "https://partners.getkkul.com",
+              "potentialAction": {
+                "@type": "SearchAction",
+                "target": "https://partners.getkkul.com/products/search?q={search_term_string}",
+                "query-input": "required name=search_term_string"
+              }
+            })
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
