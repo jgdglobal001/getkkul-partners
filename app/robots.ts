@@ -16,6 +16,10 @@ export default function robots(): MetadataRoute.Robots {
             {
                 userAgent: 'Yeti',
                 allow: ['/', '/auth/'],
+            },
+            {
+                userAgent: 'Googlebot',
+                allow: '/',
             }
         ],
         sitemap: 'https://partners.getkkul.com/sitemap.xml',
