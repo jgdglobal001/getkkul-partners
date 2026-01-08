@@ -16,13 +16,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://partners.getkkul.com'),
-  title: "겟꿀 파트너스 - 상품 홍보하고 수익을 창출하세요",
-  description: "누구나 쉽게 시작하는 겟꿀 파트너스. 다양한 상품을 홍보하고 업계 최고 수준의 커미션을 획득하세요. 획기적인 쇼핑 경험과 수익 창출 기회를 제공합니다.",
-  keywords: ["겟꿀", "겟꿀 파트너스", "제이지디글로벌", "부업", "제휴마케팅", "수익창출", "커미션", "판매 플랫폼"],
+  title: "겟꿀 파트너스 | 겟꿀 - 상품 홍보하고 수익을 창출하세요",
+  description: "겟꿀의 공식 파트너십 플랫폼, 겟꿀 파트너스. 누구나 쉽게 상품을 홍보하고 업계 최고 수준의 커미션을 획득하세요. 겟꿀 쇼핑과 연계된 획기적인 수익 창출 기회를 제공합니다.",
+  keywords: ["겟꿀", "겟꿀 파트너스", "getkkul", "제이지디글로벌", "부업", "제휴마케팅", "수익창출", "커미션", "판매 플랫폼"],
   authors: [{ name: "주식회사 제이지디글로벌" }],
+  applicationName: "겟꿀 파트너스",
   openGraph: {
-    title: "겟꿀 파트너스 - 상품 홍보하고 수익을 창출하세요",
-    description: "업계 최고 수준의 커미션과 다양한 상품군. 지금 바로 겟꿀 파트너스로 수익을 창출해보세요.",
+    title: "겟꿀 파트너스 | 겟꿀 - 상품 홍보하고 수익을 창출하세요",
+    description: "겟꿀의 공식 파트너십 플랫폼. 업계 최고 수준의 커미션과 다양한 상품군으로 지금 바로 겟꿀에서 수익을 창출해보세요.",
     url: 'https://partners.getkkul.com',
     siteName: '겟꿀 파트너스',
     locale: 'ko_KR',
@@ -30,8 +31,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: "겟꿀 파트너스 - 상품 홍보하고 수익을 창출하세요",
-    description: "누구나 쉽게 시작하는 제휴 마케팅, 겟꿀 파트너스",
+    title: "겟꿀 파트너스 | 겟꿀 - 상품 홍보하고 수익을 창출하세요",
+    description: "겟꿀의 공식 파트너십 플랫폼, 누구나 쉽게 시작하는 제휴 마케팅 겟꿀 파트너스",
   },
   verification: {
     google: 'ed4a8c2fc42ae331',
@@ -63,6 +64,7 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "Organization",
               "name": "겟꿀 파트너스",
+              "alternateName": "겟꿀",
               "url": "https://partners.getkkul.com",
               "logo": "https://partners.getkkul.com/getkkul-partners-logo.png",
               "contactPoint": {
