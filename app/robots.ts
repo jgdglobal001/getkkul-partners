@@ -9,16 +9,13 @@ export default function robots(): MetadataRoute.Robots {
                 disallow: [
                     '/dashboard/',
                     '/api/',
-                    '/auth/',
-                    '/login',
-                    '/signup',
                     '/_next/',
                     '/embed/',
                 ],
             },
             {
                 userAgent: 'Yeti',
-                allow: '/',
+                allow: ['/', '/auth/'],
             }
         ],
         sitemap: 'https://partners.getkkul.com/sitemap.xml',
