@@ -16,14 +16,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://partners.getkkul.com'),
-  title: "겟꿀 파트너스 | 겟꿀 - 상품 홍보하고 수익을 창출하세요",
-  description: "겟꿀의 공식 파트너십 플랫폼, 겟꿀 파트너스. 누구나 쉽게 상품을 홍보하고 업계 최고 수준의 커미션을 획득하세요. 겟꿀 쇼핑과 연계된 획기적인 수익 창출 기회를 제공합니다.",
-  keywords: ["겟꿀", "겟꿀 파트너스", "getkkul", "제이지디글로벌", "부업", "제휴마케팅", "수익창출", "커미션", "판매 플랫폼"],
+  title: "겟꿀 파트너스 (Getkkul Partners) | 겟꿀 - 공식 파트너십 플랫폼",
+  description: "겟꿀의 공식 파트너십 플랫폼, 겟꿀 파트너스. 누구나 상품을 홍보하고 업계 최고 수준의 커미션을 받으세요. 겟꿀(Getkkul)과 함께하는 획기적인 수익 창출 파트너스 시스템을 만나보세요.",
+  keywords: ["겟꿀", "겟꿀 파트너스", "겟꿀파트너스", "파트너스", "getkkul", "getkkul partners", "제이지디글로벌", "제휴마케팅", "부업", "수익창출", "커미션"],
   authors: [{ name: "주식회사 제이지디글로벌" }],
   applicationName: "겟꿀 파트너스",
   openGraph: {
-    title: "겟꿀 파트너스 | 겟꿀 - 상품 홍보하고 수익을 창출하세요",
-    description: "겟꿀의 공식 파트너십 플랫폼. 업계 최고 수준의 커미션과 다양한 상품군으로 지금 바로 겟꿀에서 수익을 창출해보세요.",
+    title: "겟꿀 파트너스 (Getkkul Partners) | 겟꿀",
+    description: "겟꿀의 공식 파트너십 플랫폼. '겟꿀파트너스'에서 누구나 쉽게 상품 홍보하고 수익을 창출해보세요.",
     url: 'https://partners.getkkul.com',
     siteName: '겟꿀 파트너스',
     locale: 'ko_KR',
@@ -64,7 +64,7 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "Organization",
               "name": "겟꿀 파트너스",
-              "alternateName": "겟꿀",
+              "alternateName": ["겟꿀", "겟꿀파트너스", "파트너스", "Getkkul Partners", "getkkul"],
               "url": "https://partners.getkkul.com",
               "logo": "https://partners.getkkul.com/getkkul-partners-logo.png",
               "contactPoint": {
