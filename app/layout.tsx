@@ -44,9 +44,16 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   icons: {
-    icon: '/getkkul-partners-pabicon.png',
-    apple: '/getkkul-partners-pabicon.png',
+    icon: [
+      { url: '/icon.png' },
+      { url: '/favicon.ico', sizes: 'any' }
+    ],
+    apple: [
+      { url: '/apple-icon.png' },
+      { url: '/apple-touch-icon.png' }
+    ],
   },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
