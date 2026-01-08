@@ -44,14 +44,9 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   icons: {
-    icon: [
-      { url: '/icon.png' },
-      { url: '/favicon.ico', sizes: 'any' }
-    ],
-    apple: [
-      { url: '/apple-icon.png' },
-      { url: '/apple-touch-icon.png' }
-    ],
+    icon: '/getkkul-partners-pabicon.png?v=20260108',
+    shortcut: '/getkkul-partners-pabicon.png?v=20260108',
+    apple: '/getkkul-partners-pabicon.png?v=20260108',
   },
   manifest: '/manifest.json',
 };

@@ -13,7 +13,7 @@ export default function manifest(): MetadataRoute.Manifest {
         theme_color: '#6366f1',
         icons: [
             {
-                src: '/icon.png',
+                src: '/getkkul-partners-pabicon.png?v=20260108',
                 sizes: 'any',
                 type: 'image/png',
             },
