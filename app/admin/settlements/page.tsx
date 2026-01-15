@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AdminHeader from '@/components/admin/AdminHeader';
 import Footer from '@/components/common/Footer';
+import { getSettlementsData } from '@/actions/settlements';
 
 interface Settlement {
   id: string;
@@ -55,10 +56,9 @@ export default function AdminSettlementsPage() {
   const fetchSettlements = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/settlements');
-      const result = await response.json();
+      const result = await getSettlementsData();
 
-      if (result.success && result.data) {
+      if (!result.error && result.data) {
         setSettlements(result.data.settlements);
         setStats(result.data.stats);
       }

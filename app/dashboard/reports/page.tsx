@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import Footer from '@/components/common/Footer';
+import { getReportsData } from '@/actions/reports';
 
 interface ReportData {
   clicks: number;
@@ -52,10 +53,9 @@ export default function ReportsPage() {
   const fetchReportData = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/reports');
-      const result = await response.json();
+      const result = await getReportsData();
 
-      if (result.success && result.data) {
+      if (!result.error && result.data) {
         setDailyReport(result.data.daily);
         setMonthlyReport(result.data.monthly);
         setTotalReport(result.data.total);
