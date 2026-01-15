@@ -202,6 +202,9 @@ export const orders = pgTable('orders', {
   shippingZipCode: text('shippingZipCode').notNull(),
   deliveryRequest: text('deliveryRequest'),
   partnerId: text('partnerId').references(() => users.id),
+  // 토스페이먼츠 지급대행용 컬럼
+  partnerSellerId: text('partnerSellerId'), // 토스페이먼츠 sellerId
+  partnerLinkId: text('partnerLinkId'), // 파트너 링크 ID
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow().$onUpdate(() => new Date()),
 });

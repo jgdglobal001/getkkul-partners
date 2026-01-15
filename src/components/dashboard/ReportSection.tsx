@@ -29,15 +29,41 @@ export default function ReportSection() {
   });
 
   const [lastUpdate, setLastUpdate] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 현재 날짜 설정
-    const now = new Date();
-    const formattedDate = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
-    setLastUpdate(formattedDate);
+    const fetchReportData = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/reports');
+        const result = await response.json();
 
-    // TODO: API에서 실제 데이터 가져오기
-    // fetchReportData();
+        if (result.success && result.data) {
+          setDailyReport(result.data.daily);
+          setMonthlyReport(result.data.monthly);
+
+          // 마지막 업데이트 시간 포맷팅
+          const updateTime = new Date(result.data.lastUpdate);
+          const formattedDate = `${updateTime.getFullYear()}.${String(updateTime.getMonth() + 1).padStart(2, '0')}.${String(updateTime.getDate()).padStart(2, '0')}`;
+          setLastUpdate(formattedDate);
+        } else {
+          // API 실패 시 기본 날짜 설정
+          const now = new Date();
+          const formattedDate = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
+          setLastUpdate(formattedDate);
+        }
+      } catch (error) {
+        console.error('리포트 데이터 로딩 실패:', error);
+        // 에러 시 기본 날짜 설정
+        const now = new Date();
+        const formattedDate = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
+        setLastUpdate(formattedDate);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchReportData();
   }, []);
 
   return (
@@ -76,10 +102,22 @@ export default function ReportSection() {
 
             {/* 차트 영역 */}
             <div className="h-48 bg-gray-50 rounded-lg flex items-center justify-center border border-gray-200">
-              <div className="text-center text-gray-500">
-                <div className="text-sm mb-2">데이터가 없습니다</div>
-                <div className="text-xs">활동을 시작하면 차트가 표시됩니다</div>
-              </div>
+              {isLoading ? (
+                <div className="text-center text-gray-500">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                  <div className="text-sm">데이터 로딩 중...</div>
+                </div>
+              ) : dailyReport.clicks > 0 || dailyReport.purchases > 0 ? (
+                <div className="text-center text-green-600">
+                  <div className="text-4xl mb-2">📊</div>
+                  <div className="text-sm font-medium">오늘 클릭 {dailyReport.clicks}회, 구매 {dailyReport.purchases}건</div>
+                </div>
+              ) : (
+                <div className="text-center text-gray-500">
+                  <div className="text-sm mb-2">데이터가 없습니다</div>
+                  <div className="text-xs">활동을 시작하면 차트가 표시됩니다</div>
+                </div>
+              )}
             </div>
           </div>
 

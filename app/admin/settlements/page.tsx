@@ -13,40 +13,27 @@ interface Settlement {
   amount: number;
   status: 'pending' | 'completed' | 'failed';
   settlementDate: string;
+  conversionCount: number;
 }
 
-// 샘플 데이터
-const SAMPLE_SETTLEMENTS: Settlement[] = [
-  {
-    id: '1',
-    partnerName: '김철수',
-    partnerEmail: 'kim@example.com',
-    amount: 1250000,
-    status: 'completed',
-    settlementDate: '2025. 10. 31.',
-  },
-  {
-    id: '2',
-    partnerName: '이영희',
-    partnerEmail: 'lee@example.com',
-    amount: 850000,
-    status: 'completed',
-    settlementDate: '2025. 10. 31.',
-  },
-  {
-    id: '3',
-    partnerName: '박민수',
-    partnerEmail: 'park@example.com',
-    amount: 450000,
-    status: 'pending',
-    settlementDate: '2025. 11. 30.',
-  },
-];
+interface Stats {
+  totalAmount: number;
+  completedAmount: number;
+  pendingAmount: number;
+  partnerCount: number;
+}
 
 export default function AdminSettlementsPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const [settlements, setSettlements] = useState<Settlement[]>(SAMPLE_SETTLEMENTS);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    totalAmount: 0,
+    completedAmount: 0,
+    pendingAmount: 0,
+    partnerCount: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -57,8 +44,30 @@ export default function AdminSettlementsPage() {
     if (status === 'authenticated' && session?.user?.role !== 'admin') {
       alert('관리자 권한이 필요합니다.');
       router.push('/dashboard');
+      return;
+    }
+
+    if (status === 'authenticated' && session?.user?.role === 'admin') {
+      fetchSettlements();
     }
   }, [status, session, router]);
+
+  const fetchSettlements = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/settlements');
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setSettlements(result.data.settlements);
+        setStats(result.data.stats);
+      }
+    } catch (error) {
+      console.error('정산 데이터 로딩 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -80,15 +89,7 @@ export default function AdminSettlementsPage() {
     }).format(amount);
   };
 
-  const totalAmount = settlements.reduce((sum, s) => sum + s.amount, 0);
-  const completedAmount = settlements
-    .filter(s => s.status === 'completed')
-    .reduce((sum, s) => sum + s.amount, 0);
-  const pendingAmount = settlements
-    .filter(s => s.status === 'pending')
-    .reduce((sum, s) => sum + s.amount, 0);
-
-  if (status === 'loading') {
+  if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -116,65 +117,91 @@ export default function AdminSettlementsPage() {
           </div>
 
           {/* 통계 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <p className="text-sm text-gray-600 mb-1">총 정산 금액</p>
-              <p className="text-2xl font-bold text-gray-900">{formatAmount(totalAmount)}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatAmount(stats.totalAmount)}</p>
             </div>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <p className="text-sm text-gray-600 mb-1">완료된 정산</p>
-              <p className="text-2xl font-bold text-green-600">{formatAmount(completedAmount)}</p>
+              <p className="text-2xl font-bold text-green-600">{formatAmount(stats.completedAmount)}</p>
             </div>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <p className="text-sm text-gray-600 mb-1">대기 중인 정산</p>
-              <p className="text-2xl font-bold text-yellow-600">{formatAmount(pendingAmount)}</p>
+              <p className="text-2xl font-bold text-yellow-600">{formatAmount(stats.pendingAmount)}</p>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <p className="text-sm text-gray-600 mb-1">파트너 수</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.partnerCount}명</p>
             </div>
           </div>
 
           {/* 정산 테이블 */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    파트너명
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    이메일
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    정산 금액
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    상태
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    정산일
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {settlements.map((settlement) => (
-                  <tr key={settlement.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {settlement.partnerName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {settlement.partnerEmail}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
-                      {formatAmount(settlement.amount)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      {getStatusBadge(settlement.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                      {settlement.settlementDate}
-                    </td>
+            {settlements.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="text-4xl mb-4">📊</div>
+                <p className="text-gray-600">아직 정산할 데이터가 없습니다.</p>
+                <p className="text-sm text-gray-400 mt-2">파트너가 상품을 판매하면 여기에 표시됩니다.</p>
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      파트너명
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      이메일
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      구매 건수
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      정산 금액 (커미션 15%)
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      상태
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      정산 예정일
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {settlements.map((settlement) => (
+                    <tr key={settlement.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {settlement.partnerName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {settlement.partnerEmail}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {settlement.conversionCount}건
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
+                        {formatAmount(settlement.amount)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {getStatusBadge(settlement.status)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                        {settlement.settlementDate}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* 안내 문구 */}
+          <div className="mt-6 bg-blue-50 rounded-lg p-4">
+            <p className="text-sm text-blue-800">
+              💡 정산 금액은 파트너가 판매한 상품 가격의 <strong>15%</strong>입니다.
+              토스페이먼츠 지급대행 연동 후 자동 정산이 진행됩니다.
+            </p>
           </div>
         </div>
       </main>
