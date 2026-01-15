@@ -47,10 +47,9 @@ export async function POST(request: NextRequest) {
       .update(businessRegistrations)
       .set({
         tossStatus: newStatus,
-        tossSellerId: body.sellerId,
         updatedAt: new Date(),
       })
-      .where(eq(businessRegistrations.tossSellerId, body.sellerId))
+      .where(eq(businessRegistrations.sellerId, body.sellerId))
       .returning({ id: businessRegistrations.id });
 
     if (updated.length === 0) {
