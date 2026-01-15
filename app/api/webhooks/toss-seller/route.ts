@@ -3,6 +3,8 @@ import { db } from '@/db';
 import { businessRegistrations } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
+export const runtime = 'edge';
+
 /**
  * 토스페이먼츠 셀러 상태 변경 웹훅 수신 API
  * 

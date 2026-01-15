@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as jose from 'jose';
 
+export const runtime = 'edge';
+
 /**
  * 토스페이먼츠 셀러 상태 조회 API
  * GET /api/toss/seller?userId={userId}
