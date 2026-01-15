@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { businessRegistrations } from '@/src/db/schema';
+import { businessRegistrations } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 /**
