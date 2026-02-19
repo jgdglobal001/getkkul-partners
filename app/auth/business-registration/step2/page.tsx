@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BANK_NAMES } from '@/lib/constants';
+import { safeFetchJson } from '@/lib/safe-fetch';
 
 export default function Step2Page() {
   const router = useRouter();
@@ -33,6 +34,15 @@ export default function Step2Page() {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [accountVerifyLoading, setAccountVerifyLoading] = useState(false);
   const [taxInvoiceProvided, setTaxInvoiceProvided] = useState<boolean | null>(null);
+  // 개인 중복 가입 확인 상태
+  const [isDuplicateChecked, setIsDuplicateChecked] = useState(false);
+  const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false);
+  const [duplicateModal, setDuplicateModal] = useState<{
+    show: boolean;
+    providerName: string;
+    maskedEmail: string;
+    provider: string;
+  } | null>(null);
 
   // 필수 항목 입력 여부 확인
   const isVerifyButtonEnabled =
@@ -107,6 +117,11 @@ export default function Step2Page() {
       sessionStorage.removeItem('isAccountVerified');
     }
 
+    // 개인: 이름/전화번호/이메일 변경 시 중복 확인 리셋
+    if (['representativeName', 'contactPhone', 'contactEmail', 'contactName'].includes(name)) {
+      setIsDuplicateChecked(false);
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -124,11 +139,9 @@ export default function Step2Page() {
       const businessNumber = `${formData.businessNumber1}${formData.businessNumber2}${formData.businessNumber3}`;
       const startDate = formData.startDate.replace(/-/g, '');
 
-      const response = await fetch('/api/verify-business', {
+      const { ok, data: result, error } = await safeFetchJson('/api/verify-business', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessNumber,
           businessName: formData.businessName,
@@ -137,20 +150,17 @@ export default function Step2Page() {
         }),
       });
 
-      const result = await response.json();
-
-      if (result.success) {
+      if (ok && result?.success) {
         setIsBusinessVerified(true);
         sessionStorage.setItem('isBusinessVerified', 'true');
         alert('✓ 사업자 정보가 확인되었습니다!');
       } else {
         setIsBusinessVerified(false);
-        if (result.isAlreadyRegistered) {
-          // 중복 가입 안내
+        if (result?.isAlreadyRegistered) {
           const msg = `기존에 등록된 사업자등록 정보입니다! 다시 확인하시어 로그인을 해주세요!\n\n가입된 계정: ${result.existingAccount?.providerName} (${result.existingAccount?.maskedEmail})`;
           alert(msg);
         } else {
-          alert('✗ ' + (result.message || '사업자 정보가 일치하지 않습니다.'));
+          alert('✗ ' + (result?.message || error || '사업자 정보가 일치하지 않습니다.'));
         }
       }
     } catch (error) {
@@ -173,35 +183,23 @@ export default function Step2Page() {
 
     setAccountVerifyLoading(true);
     try {
-      const response = await fetch('/api/verify-account', {
+      const { ok, data: result, error, status, isHtmlResponse } = await safeFetchJson('/api/verify-account', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bankName: formData.bankName,
           accountNumber: formData.accountNumber,
         }),
       });
 
-      console.log('HTTP Response Status:', response.status);
+      console.log('API Result:', { ok, status, result });
 
-      let result;
-      const text = await response.text();
-      console.log('Raw Response Text:', text);
-
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        console.error('JSON Parsing Error:', e);
-        alert(`서버 응답 파싱 실패 (상태: ${response.status})\nRaw: ${text.slice(0, 100)}...`);
+      if (isHtmlResponse) {
+        alert('서버에서 예상치 못한 응답이 왔습니다. 잠시 후 다시 시도해주세요.');
         return;
       }
 
-      console.log('Parsed API Result:', result);
-
-      if (result.success) {
-        // 실제 예금주 명과 입력한 예금주 명 비교
+      if (ok && result?.success) {
         const actualHolder = result.holderName?.trim() || '';
         const inputHolder = formData.accountHolder.trim();
 
@@ -217,18 +215,67 @@ export default function Step2Page() {
         }
       } else {
         console.error('API Business Logic Error:', result);
-        const errorMsg = result.error || '계좌 정보를 확인할 수 없습니다.';
-        const errorCode = result.code ? `[${result.code}] ` : '';
-        const rawInfo = result.raw ? `\n(Toss Raw: ${JSON.stringify(result.raw)})` : '';
-        alert(`✗ ${errorCode}${errorMsg}\n\n(서버 상태: ${response.status})${rawInfo}`);
+        const errorMsg = result?.error || error || '계좌 정보를 확인할 수 없습니다.';
+        const errorCode = result?.code ? `[${result.code}] ` : '';
+        alert(`✗ ${errorCode}${errorMsg}`);
       }
     } catch (error: any) {
       console.error('Network or Runtime Error during Verification:', error);
-      alert(`연결 중 오류가 발생했습니다.\nError: ${error.message}\n개발자 도구(F12) 콘솔을 확인해 주세요.`);
+      alert('연결 중 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
     } finally {
       console.log('--- Account Verification End ---');
       setAccountVerifyLoading(false);
     }
+  };
+
+  // 개인 중복 가입 확인
+  const handleCheckDuplicate = async () => {
+    if (!formData.representativeName) {
+      alert('이름을 입력해주세요.');
+      return;
+    }
+    if (!formData.businessAddress) {
+      alert('주소를 입력해주세요.');
+      return;
+    }
+    if (!formData.contactName) {
+      alert('연락처 이름을 입력해주세요.');
+      return;
+    }
+    if (!formData.contactPhone) {
+      alert('휴대폰 번호를 입력해주세요.');
+      return;
+    }
+    if (!formData.contactEmail) {
+      alert('이메일을 입력해주세요.');
+      return;
+    }
+
+    setDuplicateCheckLoading(true);
+    const { ok, data: result, error } = await safeFetchJson('/api/business-registration/check-duplicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        representativeName: formData.representativeName,
+        contactPhone: formData.contactPhone,
+      }),
+    });
+
+    if (ok && result?.success) {
+      setIsDuplicateChecked(true);
+      alert('✓ 확인되었습니다. 계좌정보를 입력해주세요.');
+    } else if (result?.isAlreadyRegistered) {
+      setIsDuplicateChecked(false);
+      setDuplicateModal({
+        show: true,
+        providerName: result.existingAccount?.providerName || '소셜',
+        maskedEmail: result.existingAccount?.maskedEmail || '',
+        provider: result.existingAccount?.provider || '',
+      });
+    } else {
+      alert(result?.message || error || '확인 중 오류가 발생했습니다.');
+    }
+    setDuplicateCheckLoading(false);
   };
 
   const handlePrev = () => {
@@ -246,9 +293,14 @@ export default function Step2Page() {
         return;
       }
     } else {
-      // 개인의 경우 최소 필수 정보 (이름, 주소) 확인
+      // 개인의 경우 필수 정보 확인
       if (!formData.representativeName || !formData.businessAddress) {
         alert('필수 항목(이름, 주소)을 모두 입력해주세요.');
+        return;
+      }
+      // 개인 중복 확인 게이트
+      if (!isDuplicateChecked) {
+        alert('중복 가입 확인을 먼저 진행해주세요.');
         return;
       }
     }
@@ -506,25 +558,46 @@ export default function Step2Page() {
             {/* 연락처 섹션 제목 */}
             {!isIndividual && (
               <div className="pt-4">
-                <h3 className="text-base font-bold mb-4">연락처</h3>
+                <h3 className="text-base font-bold mb-4">
+                  {businessType === '법인' ? '연락처' : '대표자 연락처'}
+                </h3>
+              </div>
+            )}
+
+            {/* 개인/개인사업자: 토스페이먼츠 본인인증 안내 */}
+            {(isIndividual || businessType === '개인사업자') && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+                <p className="font-bold mb-1">📱 토스페이먼츠 본인인증 안내</p>
+                <p>
+                  {isIndividual
+                    ? '가입 완료 후 토스페이먼츠에서 카카오톡을 통해 본인 인증을 요청합니다. 아래 휴대폰 번호로 인증 메시지가 발송되며, 인증을 완료해야 최종 가입이 완료됩니다.'
+                    : '가입 완료 후 토스페이먼츠에서 카카오톡을 통해 대표자 본인 인증을 요청합니다. 아래 대표자 휴대폰 번호로 인증 메시지가 발송되며, 인증을 완료해야 최종 가입이 완료됩니다.'}
+                </p>
+                <p className="mt-1 font-semibold text-blue-900">
+                  ⚠️ 반드시 {isIndividual ? '본인' : '대표자 본인'}의 휴대폰 번호를 입력해주세요.
+                </p>
               </div>
             )}
 
             {/* 연락처 정보 */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold mb-2">연락 담당자 이름 *</label>
+                <label className="block text-sm font-bold mb-2">
+                  {isIndividual ? '이름 *' : businessType === '개인사업자' ? '대표자 이름 *' : '연락 담당자 이름 *'}
+                </label>
                 <input
                   type="text"
                   name="contactName"
                   value={formData.contactName}
                   onChange={handleInputChange}
-                  placeholder={isIndividual ? "본인 이름" : ""}
+                  placeholder={isIndividual ? "본인 이름" : businessType === '개인사업자' ? "사업자등록증의 대표자명" : ""}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold mb-2">연락처 *</label>
+                <label className="block text-sm font-bold mb-2">
+                  {isIndividual ? '휴대폰 번호 *' : businessType === '개인사업자' ? '대표자 휴대폰 번호 *' : '연락처 *'}
+                </label>
                 <input
                   type="tel"
                   name="contactPhone"
@@ -546,8 +619,35 @@ export default function Step2Page() {
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
               />
+              {(isIndividual || businessType === '개인사업자') && (
+                <p className="text-xs text-gray-500 mt-1">※ 토스페이먼츠 KYC 심사 안내가 이 이메일로 발송됩니다.</p>
+              )}
             </div>
 
+            {/* 개인: 중복 가입 확인 버튼 */}
+            {isIndividual && (
+              <div>
+                <button
+                  onClick={handleCheckDuplicate}
+                  disabled={isDuplicateChecked || duplicateCheckLoading}
+                  className={`w-full px-4 py-3 rounded-lg font-bold transition ${isDuplicateChecked
+                    ? 'bg-green-500 text-white cursor-default'
+                    : duplicateCheckLoading
+                      ? 'bg-gray-400 text-gray-600 cursor-wait'
+                      : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                    }`}
+                >
+                  {isDuplicateChecked ? '✓ 확인 완료' : duplicateCheckLoading ? '확인 중...' : '확인'}
+                </button>
+                {isDuplicateChecked && (
+                  <p className="text-xs text-green-600 mt-1 text-center font-bold">정보가 확인되었습니다. 아래 계좌정보를 입력해주세요.</p>
+                )}
+              </div>
+            )}
+
+            {/* 계좌정보 섹션 — 본인/사업자 확인 완료 후에만 표시 */}
+            {(isIndividual ? isDuplicateChecked : isBusinessVerified) && (
+            <>
             {/* 계좌정보 섹션 제목 */}
             <div className="pt-4">
               <h3 className="text-base font-bold mb-4">계좌정보</h3>
@@ -615,6 +715,8 @@ export default function Step2Page() {
                 <p className="text-xs text-green-600 mt-1 text-center font-bold">인증된 계좌입니다.</p>
               )}
             </div>
+            </>
+            )}
 
             {/* 버튼 */}
             <div className="flex gap-4 pt-6">
@@ -634,6 +736,45 @@ export default function Step2Page() {
           </div>
         </div>
       </div>
+
+      {/* 중복 가입 안내 모달 */}
+      {duplicateModal?.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">⚠️</div>
+              <h3 className="text-lg font-bold text-gray-900">이미 가입된 정보입니다</h3>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 mb-4 text-sm text-gray-700 space-y-2">
+              <p>입력하신 이름과 휴대폰 번호로 이미 가입된 계정이 있습니다.</p>
+              <p className="font-bold text-gray-900">
+                가입 경로: <span className="text-blue-600">{duplicateModal.providerName}</span>
+                {duplicateModal.maskedEmail && (
+                  <span className="text-gray-500"> ({duplicateModal.maskedEmail})</span>
+                )}
+              </p>
+              <p>기존 계정으로 로그인해주세요.</p>
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={() => router.push('/auth/signin')}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition"
+              >
+                로그인 페이지로 이동
+              </button>
+              <button
+                onClick={() => setDuplicateModal(null)}
+                className="w-full border border-gray-300 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-50 transition"
+              >
+                닫기
+              </button>
+              <p className="text-xs text-center text-gray-400 mt-2">
+                로그인이 안 되는 경우 고객센터로 문의해주세요.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

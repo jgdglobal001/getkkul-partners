@@ -1,56 +1,85 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import SimpleSearchBar from '@/components/dashboard/SimpleSearchBar';
 import PromotionBanner from '@/components/dashboard/PromotionBanner';
 import ReportSection from '@/components/dashboard/ReportSection';
+import KycStatusBanner from '@/components/dashboard/KycStatusBanner';
 import Footer from '@/components/common/Footer';
+import { safeFetchJson } from '@/lib/safe-fetch';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [checkingBusiness, setCheckingBusiness] = useState(true);
+  const [tossStatus, setTossStatus] = useState<string | null>(null);
+  const [refreshingStatus, setRefreshingStatus] = useState(false);
+
+  // 토스 상태 수동 새로고침 (헤더/배너에서 호출)
+  const refreshTossStatus = useCallback(async () => {
+    setRefreshingStatus(true);
+    const { ok, data } = await safeFetchJson('/api/business-registration/check-status');
+    if (ok && data?.tossStatus) {
+      setTossStatus(data.tossStatus);
+      console.log('🔄 [Dashboard] 토스 상태 갱신:', data.tossStatus);
+    }
+    setRefreshingStatus(false);
+  }, []);
 
   useEffect(() => {
     const checkAccess = async () => {
-      // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
       if (status === 'unauthenticated') {
         router.push('/auth/signin');
         return;
       }
 
-      // 로그인된 경우 회사정보 확인
       if (status === 'authenticated' && session?.user?.id) {
-        try {
-          console.log('🔍 [Dashboard] 회사정보 확인 중...');
-          const response = await fetch('/api/business-registration');
-          const result = await response.json();
+        console.log('🔍 [Dashboard] 회사정보 확인 중...');
+        const { ok, data: result } = await safeFetchJson('/api/business-registration');
 
-          console.log('📥 [Dashboard] API 응답:', result);
-
-          if (!result.data || !result.data.isCompleted) {
-            // 회사정보 없음 → step1으로 이동
-            console.log('⚠️ [Dashboard] 회사정보 없음 → step1으로 이동');
-            router.push('/auth/business-registration/step1');
-            return;
-          }
-
-          console.log('✅ [Dashboard] 회사정보 확인 완료');
-          setCheckingBusiness(false);
-        } catch (error) {
-          console.error('❌ [Dashboard] 회사정보 확인 오류:', error);
+        if (!ok || !result?.data || !result.data.isCompleted) {
+          console.log('⚠️ [Dashboard] 회사정보 없음 → step1으로 이동');
           router.push('/auth/business-registration/step1');
+          return;
         }
+
+        // 토스페이먼츠 셀러 상태 확인 — APPROVAL_REQUIRED면 대시보드 차단
+        const dbTossStatus = result.data.tossStatus;
+        if (dbTossStatus === 'APPROVAL_REQUIRED') {
+          console.log('⚠️ [Dashboard] 토스 본인인증 미완료 → 가입완료 페이지로 이동');
+          router.push('/auth/business-registration/complete');
+          return;
+        }
+
+        // DB 상태를 먼저 세팅
+        setTossStatus(dbTossStatus || null);
+
+        // APPROVED가 아닌 경우 백그라운드로 토스 API 직접 조회하여 최신 상태 확인
+        if (dbTossStatus && dbTossStatus !== 'APPROVED') {
+          console.log('🔄 [Dashboard] 토스 최신 상태 백그라운드 확인 중...');
+          safeFetchJson('/api/business-registration/check-status')
+            .then(({ ok, data }) => {
+              if (ok && data?.tossStatus) {
+                setTossStatus(data.tossStatus);
+                console.log('✅ [Dashboard] 토스 최신 상태:', data.tossStatus);
+                if (data.tossStatus === 'APPROVAL_REQUIRED') {
+                  router.push('/auth/business-registration/complete');
+                }
+              }
+            });
+        }
+
+        console.log('✅ [Dashboard] 회사정보 확인 완료, tossStatus:', dbTossStatus);
+        setCheckingBusiness(false);
       }
     };
 
     checkAccess();
   }, [status, session, router]);
 
-  // 로딩 중 또는 회사정보 확인 중
   if (status === 'loading' || checkingBusiness) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -64,29 +93,25 @@ export default function DashboardPage() {
     );
   }
 
-  // 인증되지 않은 경우
   if (!session) {
     return null;
   }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* 헤더 */}
-      <DashboardHeader />
+      {/* 헤더 — tossStatus 전달 */}
+      <DashboardHeader tossStatus={tossStatus} onRefreshStatus={refreshTossStatus} refreshing={refreshingStatus} />
+
+      {/* KYC 상태 배너 — 지급불가 상태일 때만 표시 */}
+      <KycStatusBanner tossStatus={tossStatus} onRefresh={refreshTossStatus} refreshing={refreshingStatus} />
 
       {/* 메인 콘텐츠 */}
       <main className="flex-1">
-        {/* 상품검색 섹션 */}
         <SimpleSearchBar />
-
-        {/* 프로모션 배너 */}
         <PromotionBanner />
-
-        {/* 리포트 섹션 */}
         <ReportSection />
       </main>
 
-      {/* 푸터 */}
       <Footer />
     </div>
   );

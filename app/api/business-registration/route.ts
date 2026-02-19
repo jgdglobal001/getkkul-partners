@@ -226,26 +226,46 @@ export async function POST(request: NextRequest) {
 
     // === DB Update ===
     console.log('[API] Updating DB...');
+
+    // 개인 사용자의 경우 빈 문자열을 null로 변환
+    const dbData = {
+      businessType: businessType || '법인',
+      businessName: businessName || representativeName, // 개인은 상호명 대신 이름 사용
+      businessNumber: fullBusinessNumber, // 개인은 null
+      representativeName,
+      businessCategory: businessCategory || null,
+      businessType2: businessType2 || null,
+      businessAddress: businessAddress || null,
+      contactName, contactPhone, contactEmail,
+      bankName, accountNumber, accountHolder,
+      platformUrl: platformUrl || null,
+      mobileAppUrl: mobileAppUrl || null,
+      step: 3,
+      isCompleted: true,
+      sellerId: tossSellerId,
+      tossStatus: tossStatus,
+    };
+
+    // 중복 등록 체크 — 기존 정산 기록 보호
     const existing = await db.select().from(businessRegistrations).where(eq(businessRegistrations.userId, userId)).limit(1);
 
     if (existing[0]) {
+      // 이미 완료된 등록이 있으면 409 Conflict
+      if (existing[0].isCompleted && existing[0].step === 3) {
+        return NextResponse.json({
+          error: '이미 등록된 계정입니다. 기존 계정으로 로그인해주세요.',
+          errorType: 'DUPLICATE_REGISTRATION'
+        }, { status: 409 });
+      }
+      // 미완료 등록이면 업데이트 허용
       await db.update(businessRegistrations).set({
-        businessType: businessType || '법인',
-        businessName, businessNumber: fullBusinessNumber, representativeName,
-        businessCategory, businessType2: businessType2 || '', businessAddress,
-        contactName, contactPhone, contactEmail, bankName, accountNumber, accountHolder,
-        platformUrl, mobileAppUrl, step: 3, isCompleted: true,
-        sellerId: tossSellerId, tossStatus: tossStatus,
-        updatedAt: new Date()
+        ...dbData,
+        updatedAt: new Date(),
       }).where(eq(businessRegistrations.userId, userId));
     } else {
       await db.insert(businessRegistrations).values({
-        userId, businessType: businessType || '법인',
-        businessName, businessNumber: fullBusinessNumber, representativeName,
-        businessCategory, businessType2: businessType2 || '', businessAddress,
-        contactName, contactPhone, contactEmail, bankName, accountNumber, accountHolder,
-        platformUrl, mobileAppUrl, step: 3, isCompleted: true,
-        sellerId: tossSellerId, tossStatus: tossStatus
+        userId,
+        ...dbData,
       });
     }
 

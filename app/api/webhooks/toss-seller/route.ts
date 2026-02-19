@@ -5,13 +5,16 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
-// 토스 웹훅 요청 타입
+// 토스페이먼츠 실제 웹훅 이벤트 타입: seller.changed
+// 상태값: APPROVAL_REQUIRED | PARTIALLY_APPROVED | KYC_REQUIRED | APPROVED
 interface TossSellerWebhook {
-  eventType: 'SELLER_STATUS_CHANGED';
-  sellerId: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
-  statusMessage?: string;
-  timestamp: string;
+  eventType: string;
+  data: {
+    sellerId: string;
+    status: string;
+    [key: string]: unknown;
+  };
+  createdAt?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -26,44 +29,42 @@ export async function POST(request: NextRequest) {
     const body: TossSellerWebhook = await request.json();
     console.log('[Toss Webhook] Received:', JSON.stringify(body));
 
-    // 이벤트 타입 확인
-    if (body.eventType !== 'SELLER_STATUS_CHANGED') {
+    // 이벤트 타입 확인 — 토스 실제 이벤트: seller.changed
+    if (body.eventType !== 'seller.changed') {
       console.log('[Toss Webhook] Ignoring event type:', body.eventType);
       return NextResponse.json({ success: true, message: 'Event ignored' });
     }
 
-    // 상태 매핑
-    const statusMap: Record<string, string> = {
-      'PENDING': 'PENDING',
-      'APPROVED': 'COMPLETED',
-      'REJECTED': 'REJECTED',
-      'SUSPENDED': 'SUSPENDED',
-    };
+    const sellerId = body.data?.sellerId;
+    const newStatus = body.data?.status;
 
-    const newStatus = statusMap[body.status] || body.status;
+    if (!sellerId || !newStatus) {
+      console.warn('[Toss Webhook] Missing sellerId or status in payload');
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
 
-    // DB 업데이트 - sellerId로 찾아서 상태 업데이트
+    // DB 업데이트 — 토스 상태값을 그대로 저장
     const updated = await db
       .update(businessRegistrations)
       .set({
         tossStatus: newStatus,
         updatedAt: new Date(),
       })
-      .where(eq(businessRegistrations.sellerId, body.sellerId))
+      .where(eq(businessRegistrations.sellerId, sellerId))
       .returning({ id: businessRegistrations.id });
 
     if (updated.length === 0) {
-      console.warn('[Toss Webhook] Seller not found:', body.sellerId);
+      console.warn('[Toss Webhook] Seller not found:', sellerId);
       return NextResponse.json({ success: false, message: 'Seller not found' }, { status: 404 });
     }
 
-    console.log('[Toss Webhook] Updated seller status:', body.sellerId, '->', newStatus);
+    console.log('[Toss Webhook] Updated seller status:', sellerId, '->', newStatus);
 
     return NextResponse.json({
       success: true,
       message: 'Status updated',
-      sellerId: body.sellerId,
-      newStatus: newStatus,
+      sellerId,
+      newStatus,
     });
   } catch (error) {
     console.error('[Toss Webhook] Error:', error);

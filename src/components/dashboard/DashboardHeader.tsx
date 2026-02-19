@@ -6,7 +6,13 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { FaBell } from 'react-icons/fa';
 
-export default function DashboardHeader() {
+interface DashboardHeaderProps {
+  tossStatus?: string | null;
+  onRefreshStatus?: () => void;
+  refreshing?: boolean;
+}
+
+export default function DashboardHeader({ tossStatus, onRefreshStatus, refreshing }: DashboardHeaderProps) {
   const { data: session } = useSession();
   const [partnershipId, setPartnershipId] = useState('');
   const [isHelpDropdownOpen, setIsHelpDropdownOpen] = useState(false);
@@ -128,6 +134,52 @@ export default function DashboardHeader() {
 
           {/* 우측 영역 */}
           <div className="flex items-center gap-4">
+            {/* KYC 지급 상태 뱃지 */}
+            {tossStatus && (
+              <div className="hidden sm:flex items-center gap-1.5">
+                {(tossStatus === 'PARTIALLY_APPROVED' || tossStatus === 'APPROVED') ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-green-50 text-green-700 rounded-full border border-green-200">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                    {tossStatus === 'APPROVED' ? '지급가능' : '지급가능 (주 1천만원 미만)'}
+                  </span>
+                ) : tossStatus === 'KYC_REQUIRED' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-red-50 text-red-700 rounded-full border border-red-200">
+                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
+                    지급불가 (KYC 필요)
+                    {onRefreshStatus && (
+                      <button
+                        onClick={onRefreshStatus}
+                        disabled={refreshing}
+                        className="ml-1 text-red-500 hover:text-red-700 disabled:opacity-50"
+                        title="상태 새로고침"
+                      >
+                        <svg className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </button>
+                    )}
+                  </span>
+                ) : tossStatus !== 'APPROVAL_REQUIRED' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-yellow-50 text-yellow-700 rounded-full border border-yellow-200">
+                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
+                    {tossStatus}
+                    {onRefreshStatus && (
+                      <button
+                        onClick={onRefreshStatus}
+                        disabled={refreshing}
+                        className="ml-1 text-yellow-500 hover:text-yellow-700 disabled:opacity-50"
+                        title="상태 새로고침"
+                      >
+                        <svg className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </button>
+                    )}
+                  </span>
+                ) : null}
+              </div>
+            )}
+
             {/* 알림 아이콘 */}
             <button className="relative p-2 text-gray-600 hover:text-gray-900">
               <FaBell className="w-5 h-5" />

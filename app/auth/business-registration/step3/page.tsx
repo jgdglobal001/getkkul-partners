@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { safeFetchJson } from '@/lib/safe-fetch';
 
 export default function Step3Page() {
   const router = useRouter();
@@ -16,7 +17,12 @@ export default function Step3Page() {
   });
   const [platformUrls, setPlatformUrls] = useState<string[]>([]);
   const [mobileAppUrls, setMobileAppUrls] = useState<string[]>([]);
-  const [debugError, setDebugError] = useState<string | null>(null);
+  const [errorModal, setErrorModal] = useState<{
+    show: boolean;
+    type: 'duplicate' | 'toss' | 'server' | 'unknown';
+    userMessage: string;
+    debugInfo?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!session?.user?.id) {
@@ -62,7 +68,7 @@ export default function Step3Page() {
   };
 
   const handleNext = async () => {
-    setDebugError(null);
+    setErrorModal(null);
     if (!isNextButtonEnabled) {
       alert('플랫폼 또는 모바일 앱 URL을 최소 1개 추가하고, 최종 승인에 동의해주세요.');
       return;
@@ -81,11 +87,9 @@ export default function Step3Page() {
       const { businessType: jongMok, ...restStep2 } = step2Data;
 
       // API에 데이터 전송
-      const response = await fetch('/api/business-registration', {
+      const { ok, data: responseData, status, error: fetchError, isHtmlResponse } = await safeFetchJson('/api/business-registration', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessType: businessType, // Entity Type
           businessType2: jongMok, // Jong-mok
@@ -96,13 +100,50 @@ export default function Step3Page() {
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error:', errorData);
-        // Throw an error object that includes the details
-        const err = new Error(errorData.error || '사업자 등록 정보 저장 실패');
-        (err as any).details = errorData.details;
-        throw err;
+      if (!ok) {
+        console.error('API Error:', responseData);
+
+        // 실패 시 사업자 확인 상태 초기화
+        sessionStorage.removeItem('isBusinessVerified');
+
+        if (isHtmlResponse) {
+          setErrorModal({
+            show: true,
+            type: 'server',
+            userMessage: '서버에서 예상치 못한 응답이 왔습니다.\n잠시 후 다시 시도해주세요.',
+          });
+        } else if (responseData?.errorType === 'DUPLICATE_REGISTRATION' || status === 409) {
+          setErrorModal({
+            show: true,
+            type: 'duplicate',
+            userMessage: '이미 가입된 계정입니다.\n기존 계정으로 로그인해주세요.',
+          });
+        } else if (responseData?.details) {
+          // 토스 API 오류
+          const debugInfo = `Toss Status: ${responseData.details.tossStatus}\nMessage: ${typeof responseData.details.tossMessage === 'object' ? JSON.stringify(responseData.details.tossMessage, null, 2) : responseData.details.tossMessage}${responseData.details.sentPayload ? `\n\nPayload:\n${JSON.stringify(responseData.details.sentPayload, null, 2)}` : ''}`;
+          setErrorModal({
+            show: true,
+            type: 'toss',
+            userMessage: '토스페이먼츠 연동 중 오류가 발생했습니다.\n입력하신 정보를 다시 확인해주세요.\n\n(은행명, 계좌번호, 예금주명이 정확한지 확인해보세요)',
+            debugInfo,
+          });
+        } else if (status === 0) {
+          // 네트워크 오류 (safeFetchJson에서 status=0)
+          setErrorModal({
+            show: true,
+            type: 'unknown',
+            userMessage: '네트워크 오류가 발생했습니다.\n인터넷 연결을 확인한 후 다시 시도해주세요.',
+            debugInfo: fetchError || undefined,
+          });
+        } else {
+          setErrorModal({
+            show: true,
+            type: 'server',
+            userMessage: '서버 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.',
+            debugInfo: responseData?.error || fetchError || '알 수 없는 오류',
+          });
+        }
+        return;
       }
 
       // 사업자명을 sessionStorage에 저장 (완료 페이지에서 사용)
@@ -114,28 +155,22 @@ export default function Step3Page() {
       sessionStorage.removeItem('businessType');
       sessionStorage.removeItem('agreements');
       sessionStorage.removeItem('step2Data');
-      sessionStorage.removeItem('isBusinessVerified'); // 사업자 확인 상태도 삭제
+      sessionStorage.removeItem('isBusinessVerified');
 
       // 완료 페이지로 이동
       router.push('/auth/business-registration/complete');
     } catch (error: any) {
       console.error('Error:', error);
-      let msg = error.message || '사업자 등록 정보 저장 중 오류가 발생했습니다.';
 
-      if (error.details) {
-        msg += `\n\n[디버그 정보]\nToss Status: ${error.details.tossStatus}\nMessage: ${typeof error.details.tossMessage === 'object' ? JSON.stringify(error.details.tossMessage, null, 2) : error.details.tossMessage}`;
-        if (error.details.sentPayload) {
-          msg += `\n\nPayload:\n${JSON.stringify(error.details.sentPayload, null, 2)}`;
-        }
-      } else if (msg.includes('Status: 500')) {
-        msg += '\n\n[팁] 은행, 계좌번호, 예금주명이 정확한지 확인해주세요.\n(특히 예금주명이 은행 앱에서 잘려서 표시되는지 확인해보세요!)';
-      }
-
-      // 실패 시 사업자 확인 상태 초기화 (다시 확인받아야 함)
+      // 실패 시 사업자 확인 상태 초기화
       sessionStorage.removeItem('isBusinessVerified');
 
-      setDebugError(msg);
-      alert("오류가 발생했습니다. 하단의 붉은 박스 내용을 확인해주세요.");
+      setErrorModal({
+        show: true,
+        type: 'unknown',
+        userMessage: '네트워크 오류가 발생했습니다.\n인터넷 연결을 확인한 후 다시 시도해주세요.',
+        debugInfo: error.message || String(error),
+      });
     }
   };
 
@@ -292,18 +327,6 @@ export default function Step3Page() {
               </p>
             </div>
 
-            {/* 디버그 에러 메시지 (복사용) */}
-            {debugError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-red-600 font-bold mb-2">오류가 발생했습니다 (아래 내용을 복사해주세요):</p>
-                <textarea
-                  readOnly
-                  className="w-full h-48 p-2 text-xs border border-red-300 rounded bg-white text-gray-800 font-mono"
-                  value={debugError}
-                />
-              </div>
-            )}
-
             {/* 버튼 */}
             <div className="flex gap-4 pt-6">
               <button
@@ -326,6 +349,84 @@ export default function Step3Page() {
           </div>
         </div>
       </div>
+
+      {/* 에러 모달 */}
+      {errorModal?.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            {/* 아이콘 */}
+            <div className="flex justify-center mb-4">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                errorModal.type === 'duplicate' ? 'bg-orange-100' : 'bg-red-100'
+              }`}>
+                {errorModal.type === 'duplicate' ? (
+                  <svg className="w-7 h-7 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : (
+                  <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+            </div>
+
+            {/* 제목 */}
+            <h3 className="text-lg font-bold text-center mb-3">
+              {errorModal.type === 'duplicate' && '이미 가입된 계정'}
+              {errorModal.type === 'toss' && '정보 확인 필요'}
+              {errorModal.type === 'server' && '서버 오류'}
+              {errorModal.type === 'unknown' && '연결 오류'}
+            </h3>
+
+            {/* 사용자 메시지 */}
+            <p className="text-sm text-gray-700 text-center whitespace-pre-line mb-5">
+              {errorModal.userMessage}
+            </p>
+
+            {/* 개발 모드 디버그 정보 */}
+            {process.env.NODE_ENV === 'development' && errorModal.debugInfo && (
+              <details className="mb-4">
+                <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
+                  🔧 개발자 정보 (개발 모드에서만 표시)
+                </summary>
+                <textarea
+                  readOnly
+                  className="w-full h-32 p-2 mt-2 text-xs border border-gray-200 rounded bg-gray-50 text-gray-600 font-mono"
+                  value={errorModal.debugInfo}
+                />
+              </details>
+            )}
+
+            {/* 버튼 */}
+            <div className="flex flex-col gap-2">
+              {errorModal.type === 'duplicate' ? (
+                <>
+                  <button
+                    onClick={() => router.push('/auth/signin')}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-full transition"
+                  >
+                    로그인 페이지로 이동
+                  </button>
+                  <button
+                    onClick={() => setErrorModal(null)}
+                    className="w-full text-gray-500 hover:text-gray-700 text-sm py-2"
+                  >
+                    닫기
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setErrorModal(null)}
+                  className="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 rounded-full transition"
+                >
+                  확인
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
