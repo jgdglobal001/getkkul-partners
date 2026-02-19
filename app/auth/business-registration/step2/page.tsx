@@ -183,7 +183,7 @@ export default function Step2Page() {
 
     setAccountVerifyLoading(true);
     try {
-      const { ok, data: result, error, status, isHtmlResponse } = await safeFetchJson('/api/verify-account', {
+      const { ok, data: result, error, status, isHtmlResponse } = await safeFetchJson('/api/verify-business?action=verify-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -252,7 +252,7 @@ export default function Step2Page() {
     }
 
     setDuplicateCheckLoading(true);
-    const { ok, data: result, error } = await safeFetchJson('/api/business-registration/check-duplicate', {
+    const { ok, data: result, error } = await safeFetchJson('/api/business-registration?action=check-duplicate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

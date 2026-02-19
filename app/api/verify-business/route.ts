@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { businessRegistrations, users, accounts } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { getToken } from 'next-auth/jwt';
+import { BANK_CODES } from '@/lib/constants';
 
 export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get('action');
+
+  if (action === 'verify-account') return handleVerifyAccount(request);
+
   try {
     console.log('📨 API 요청 수신');
     let body;
@@ -204,3 +211,46 @@ export async function POST(request: NextRequest) {
   }
 }
 
+
+
+// ─── verify-account 핸들러 ───
+async function handleVerifyAccount(request: NextRequest) {
+  console.log('[API] verify-account 시작');
+  try {
+    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+    const token = await getToken({ req: request, secret, secureCookie: process.env.NODE_ENV === 'production' });
+    if (!token?.sub) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
+
+    const body = await request.json();
+    const { bankName, accountNumber } = body;
+
+    const bankCode = BANK_CODES[bankName];
+    if (!bankCode) return NextResponse.json({ error: '지원되지 않는 은행입니다.' }, { status: 400 });
+
+    const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY?.trim();
+    if (!secretKey) return NextResponse.json({ error: '서버 설정 오류 (API Key missing)' }, { status: 500 });
+
+    const basicAuth = btoa(`${secretKey}:`);
+    const tossResponse = await fetch('https://api.tosspayments.com/v2/bank-accounts/lookup-holder-name', {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bankCode, accountNumber }),
+    });
+
+    const text = await tossResponse.text();
+    let data;
+    try { data = JSON.parse(text); } catch {
+      return NextResponse.json({ error: '토스 서버에서 올바르지 않은 응답이 왔습니다.', raw: text }, { status: 502 });
+    }
+
+    if (!tossResponse.ok) {
+      return NextResponse.json({ error: data.message || '계좌 정보를 확인할 수 없습니다.', code: data.code }, { status: tossResponse.status });
+    }
+
+    const holderName = data.entityBody?.holderName;
+    return NextResponse.json({ success: true, holderName });
+  } catch (error: any) {
+    console.error('[API] 예외 발생:', error);
+    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
+  }
+}

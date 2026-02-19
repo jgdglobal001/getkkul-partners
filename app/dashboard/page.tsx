@@ -21,7 +21,7 @@ export default function DashboardPage() {
   // 토스 상태 수동 새로고침 (헤더/배너에서 호출)
   const refreshTossStatus = useCallback(async () => {
     setRefreshingStatus(true);
-    const { ok, data } = await safeFetchJson('/api/business-registration/check-status');
+    const { ok, data } = await safeFetchJson('/api/business-registration?action=check-status');
     if (ok && data?.tossStatus) {
       setTossStatus(data.tossStatus);
       console.log('🔄 [Dashboard] 토스 상태 갱신:', data.tossStatus);
@@ -60,7 +60,7 @@ export default function DashboardPage() {
         // APPROVED가 아닌 경우 백그라운드로 토스 API 직접 조회하여 최신 상태 확인
         if (dbTossStatus && dbTossStatus !== 'APPROVED') {
           console.log('🔄 [Dashboard] 토스 최신 상태 백그라운드 확인 중...');
-          safeFetchJson('/api/business-registration/check-status')
+          safeFetchJson('/api/business-registration?action=check-status')
             .then(({ ok, data }) => {
               if (ok && data?.tossStatus) {
                 setTossStatus(data.tossStatus);

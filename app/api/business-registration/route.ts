@@ -1,6 +1,6 @@
 import { db } from '@/db';
-import { businessRegistrations } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { businessRegistrations, users, accounts } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import * as jose from 'jose';
 import { getToken } from 'next-auth/jwt';
@@ -10,6 +10,12 @@ export const runtime = 'edge';
 import { BANK_CODES } from '@/lib/constants';
 
 export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get('action');
+
+  if (action === 'check-duplicate') return handleCheckDuplicate(request);
+  if (action === 'update-contact') return handleUpdateContact(request);
+
   console.log('[API] Business Registration POST Request Received (JWT MODE)');
 
   try {
@@ -26,7 +32,7 @@ export async function POST(request: NextRequest) {
     const cookies = cookieHeader.split(';').map(c => c.trim().split('=')[0]);
     console.log('[API] Cookies in Request:', cookies);
 
-    // Call getToken with secureCookie explicit setting if needed. 
+    // Call getToken with secureCookie explicit setting if needed.
     // Usually strict secure cookies are used in prod.
     const token = await getToken({
       req: request,
@@ -280,6 +286,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get('action');
+
+  if (action === 'check-status') return handleCheckStatus(request);
+
   console.log('[API] Business Registration GET Request Received');
 
   try {
@@ -317,6 +328,208 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error('[API] GET Error:', error);
+    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
+  }
+}
+
+
+// ─── check-duplicate 핸들러 ───
+async function handleCheckDuplicate(request: NextRequest) {
+  console.log('[API] Check Duplicate - Request Received');
+  try {
+    let body;
+    try { body = await request.json(); } catch {
+      return NextResponse.json({ success: false, message: 'JSON 파싱 오류' }, { status: 400 });
+    }
+    const { representativeName, contactPhone } = body;
+    if (!representativeName || !contactPhone) {
+      return NextResponse.json({ success: false, message: '이름과 휴대폰 번호를 모두 입력해주세요.' }, { status: 400 });
+    }
+    const phoneClean = contactPhone.replace(/-/g, '');
+    const phoneFormatted = phoneClean.length === 11
+      ? `${phoneClean.slice(0, 3)}-${phoneClean.slice(3, 7)}-${phoneClean.slice(7)}`
+      : contactPhone;
+
+    const selectFields = {
+      id: businessRegistrations.id,
+      userId: businessRegistrations.userId,
+      isCompleted: businessRegistrations.isCompleted,
+      step: businessRegistrations.step,
+      user: { email: users.email },
+      account: { provider: accounts.provider },
+    };
+
+    let result = (await db.select(selectFields).from(businessRegistrations)
+      .leftJoin(users, eq(businessRegistrations.userId, users.id))
+      .leftJoin(accounts, eq(businessRegistrations.userId, accounts.userId))
+      .where(and(eq(businessRegistrations.representativeName, representativeName), eq(businessRegistrations.contactPhone, phoneFormatted)))
+      .limit(1))[0];
+
+    if (!result && phoneFormatted !== contactPhone) {
+      result = (await db.select(selectFields).from(businessRegistrations)
+        .leftJoin(users, eq(businessRegistrations.userId, users.id))
+        .leftJoin(accounts, eq(businessRegistrations.userId, accounts.userId))
+        .where(and(eq(businessRegistrations.representativeName, representativeName), eq(businessRegistrations.contactPhone, contactPhone)))
+        .limit(1))[0];
+    }
+
+    if (result && result.isCompleted && result.step === 3) {
+      const rawEmail = result.user?.email || '';
+      let maskedEmail = '';
+      if (rawEmail) {
+        const [id, domain] = rawEmail.split('@');
+        maskedEmail = id.substring(0, 1) + '*'.repeat(Math.max(id.length - 1, 1)) + '@' + domain;
+      }
+      const providerMap: Record<string, string> = { 'google': '구글', 'naver': '네이버', 'kakao': '카카오' };
+      const providerName = providerMap[result.account?.provider || ''] || result.account?.provider || '소셜';
+      return NextResponse.json({
+        success: false, isAlreadyRegistered: true,
+        message: '이미 가입된 정보입니다. 기존 계정으로 로그인해주세요.',
+        existingAccount: { provider: result.account?.provider, providerName, maskedEmail }
+      }, { status: 409 });
+    }
+
+    return NextResponse.json({ success: true, message: '가입 가능합니다.' });
+  } catch (error: any) {
+    console.error('[API] Check Duplicate - 오류:', error);
+    return NextResponse.json({ success: false, message: '서버 오류가 발생했습니다.' }, { status: 500 });
+  }
+}
+
+// ─── check-status 핸들러 ───
+async function handleCheckStatus(request: NextRequest) {
+  console.log('[API] Check Toss Seller Status - Request Received');
+  try {
+    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+    const token = await getToken({ req: request, secret, secureCookie: process.env.NODE_ENV === 'production' });
+    if (!token?.sub) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
+    const userId = token.sub;
+
+    const existing = await db.select().from(businessRegistrations).where(eq(businessRegistrations.userId, userId)).limit(1);
+    if (!existing[0]) return NextResponse.json({ error: '등록된 사업자 정보가 없습니다.' }, { status: 404 });
+    const registration = existing[0];
+
+    if (!registration.sellerId) {
+      return NextResponse.json({ tossStatus: registration.tossStatus || 'PENDING', message: '토스페이먼츠 셀러 ID가 없습니다.', fromDB: true });
+    }
+
+    const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY?.trim();
+    if (!secretKey) {
+      return NextResponse.json({ tossStatus: registration.tossStatus || 'PENDING', message: '토스 API 키가 설정되지 않았습니다.', fromDB: true });
+    }
+
+    const basicAuth = btoa(`${secretKey}:`);
+    const tossResponse = await fetch(`https://api.tosspayments.com/v2/sellers/${registration.sellerId}`, {
+      method: 'GET', headers: { 'Authorization': `Basic ${basicAuth}` },
+    });
+
+    const responseText = await tossResponse.text();
+    let tossData;
+    try { tossData = JSON.parse(responseText); } catch {
+      return NextResponse.json({ tossStatus: registration.tossStatus || 'PENDING', message: '토스 응답 파싱 실패', fromDB: true });
+    }
+
+    if (!tossResponse.ok) {
+      return NextResponse.json({ tossStatus: registration.tossStatus || 'PENDING', message: tossData.message || '토스 상태 조회 실패', fromDB: true });
+    }
+
+    const latestStatus = tossData.entityBody?.status || tossData.status;
+    if (latestStatus && latestStatus !== registration.tossStatus) {
+      await db.update(businessRegistrations).set({ tossStatus: latestStatus, updatedAt: new Date() }).where(eq(businessRegistrations.userId, userId));
+    }
+
+    return NextResponse.json({
+      tossStatus: latestStatus || registration.tossStatus || 'PENDING',
+      sellerId: registration.sellerId, businessType: registration.businessType,
+      contactPhone: registration.contactPhone, contactEmail: registration.contactEmail, fromDB: false,
+    });
+  } catch (error: any) {
+    console.error('[API] Check status error:', error);
+    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
+  }
+}
+
+// ─── update-contact 핸들러 ───
+async function handleUpdateContact(request: NextRequest) {
+  console.log('[API] Update Contact - Request Received');
+  try {
+    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+    const token = await getToken({ req: request, secret, secureCookie: process.env.NODE_ENV === 'production' });
+    if (!token?.sub) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
+    const userId = token.sub;
+
+    const body = await request.json();
+    const { contactPhone, contactEmail } = body;
+    if (!contactPhone && !contactEmail) return NextResponse.json({ error: '수정할 연락처 정보가 없습니다.' }, { status: 400 });
+
+    const existing = await db.select().from(businessRegistrations).where(eq(businessRegistrations.userId, userId)).limit(1);
+    if (!existing[0]) return NextResponse.json({ error: '등록된 사업자 정보가 없습니다.' }, { status: 404 });
+    const registration = existing[0];
+    if (!registration.sellerId) return NextResponse.json({ error: '토스페이먼츠 셀러 ID가 없습니다.' }, { status: 400 });
+
+    const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY?.trim();
+    const securityKey = process.env.TOSS_PAYMENTS_SECURITY_KEY?.trim();
+    if (!secretKey || !securityKey) return NextResponse.json({ error: '토스 API 키가 설정되지 않았습니다.' }, { status: 500 });
+
+    const isIndividual = registration.businessType === '개인';
+    const payload: any = {};
+    if (isIndividual) {
+      payload.individual = {};
+      if (contactPhone) payload.individual.phone = contactPhone.replace(/-/g, '');
+      if (contactEmail) payload.individual.email = contactEmail;
+    } else {
+      payload.company = {};
+      if (contactPhone) payload.company.phone = contactPhone.replace(/-/g, '');
+      if (contactEmail) payload.company.email = contactEmail;
+    }
+
+    const key = new Uint8Array(securityKey.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    const iat = `${kstDate.getUTCFullYear()}-${pad(kstDate.getUTCMonth() + 1)}-${pad(kstDate.getUTCDate())}T${pad(kstDate.getUTCHours())}:${pad(kstDate.getUTCMinutes())}:${pad(kstDate.getUTCSeconds())}+09:00`;
+    const nonce = crypto.randomUUID();
+
+    const encryptedBody = await new jose.CompactEncrypt(new TextEncoder().encode(JSON.stringify(payload)))
+      .setProtectedHeader({ alg: 'dir', enc: 'A256GCM', iat, nonce }).encrypt(key);
+
+    const basicAuth = btoa(secretKey + ':');
+    const tossResponse = await fetch(`https://api.tosspayments.com/v2/sellers/${registration.sellerId}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'text/plain', 'TossPayments-api-security-mode': 'ENCRYPTION' },
+      body: encryptedBody,
+    });
+
+    const encryptedResponseText = await tossResponse.text();
+    let decryptedResponse;
+    try {
+      if (encryptedResponseText.startsWith('ey')) {
+        const { plaintext } = await jose.compactDecrypt(encryptedResponseText, key);
+        decryptedResponse = JSON.parse(new TextDecoder().decode(plaintext));
+      } else {
+        decryptedResponse = JSON.parse(encryptedResponseText);
+      }
+    } catch { decryptedResponse = { error: '복호화 실패', raw: encryptedResponseText }; }
+
+    if (!tossResponse.ok) {
+      const errMsg = decryptedResponse?.entityBody?.message || decryptedResponse?.message || '연락처 수정 실패';
+      return NextResponse.json({ error: errMsg, details: decryptedResponse }, { status: tossResponse.status });
+    }
+
+    const dbUpdate: any = { updatedAt: new Date() };
+    if (contactPhone) dbUpdate.contactPhone = contactPhone;
+    if (contactEmail) dbUpdate.contactEmail = contactEmail;
+    const latestStatus = decryptedResponse?.entityBody?.status;
+    if (latestStatus) dbUpdate.tossStatus = latestStatus;
+
+    await db.update(businessRegistrations).set(dbUpdate).where(eq(businessRegistrations.userId, userId));
+
+    return NextResponse.json({
+      success: true, tossStatus: latestStatus || registration.tossStatus,
+      message: '연락처가 수정되었습니다. 토스페이먼츠에서 새 번호로 인증을 다시 진행합니다.',
+    });
+  } catch (error: any) {
+    console.error('[API] Update contact error:', error);
     return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
   }
 }

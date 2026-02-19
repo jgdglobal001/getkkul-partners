@@ -23,7 +23,7 @@ export default function CompletePage() {
   // 토스 셀러 상태 확인
   const checkStatus = useCallback(async () => {
     setChecking(true);
-    const { ok, data } = await safeFetchJson('/api/business-registration/check-status');
+    const { ok, data } = await safeFetchJson('/api/business-registration?action=check-status');
     if (ok && data?.tossStatus) {
       setTossStatus(data.tossStatus);
       if (data.contactPhone) setContactPhone(data.contactPhone);
@@ -57,7 +57,7 @@ export default function CompletePage() {
     if (!newPhone.trim()) { alert('새 전화번호를 입력해주세요.'); return; }
     setUpdating(true);
     setUpdateMsg('');
-    const { ok, data, error } = await safeFetchJson('/api/business-registration/update-contact', {
+    const { ok, data, error } = await safeFetchJson('/api/business-registration?action=update-contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contactPhone: newPhone }),
