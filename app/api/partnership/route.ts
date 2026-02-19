@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
 
     if (!businessRegistration) {
       return NextResponse.json(
-        { error: '사업자 등록 정보가 없습니다.' },
-        { status: 404 }
+        { partnershipId: null },
+        { status: 200 }
       );
     }
 

@@ -7,33 +7,7 @@ import { getToken } from 'next-auth/jwt';
 
 export const runtime = 'edge';
 
-// 은행 코드 매핑
-const BANK_CODES: Record<string, string> = {
-  'KB국민은행': '004',
-  'SC제일은행': '023',
-  '경남은행': '039',
-  '광주은행': '034',
-  '기업은행': '003',
-  '농협은행': '011',
-  '대구은행': '031',
-  '부산은행': '032',
-  '산업은행': '002',
-  '수협은행': '007',
-  '신한은행': '088',
-  '신협': '048',
-  '씨티은행': '027',
-  '우리은행': '020',
-  '우체국': '071',
-  '저축은행중앙회': '050',
-  '전북은행': '037',
-  '제주은행': '035',
-  '카카오뱅크': '090',
-  '케이뱅크': '089',
-  '토스뱅크': '092',
-  '하나은행': '081',
-  '새마을금고': '045',
-  '국민은행': '004', '농협': '011', '신한': '088', '우리': '020', '하나': '081', '기업': '003',
-};
+import { BANK_CODES } from '@/lib/constants';
 
 export async function POST(request: NextRequest) {
   console.log('[API] Business Registration POST Request Received (JWT MODE)');
@@ -82,12 +56,17 @@ export async function POST(request: NextRequest) {
       accountHolder, platformUrl, mobileAppUrl
     } = body;
 
-    if (!businessName || !businessNumber1 || !businessNumber2 || !businessNumber3) {
+    if (businessType !== '개인' && (!businessName || !businessNumber1 || !businessNumber2 || !businessNumber3)) {
       return NextResponse.json({ error: '필수 항목 누락' }, { status: 400 });
     }
 
-    const fullBusinessNumber = `${businessNumber1}-${businessNumber2}-${businessNumber3}`;
-    const bizNumClean = fullBusinessNumber.replace(/-/g, '');
+    let fullBusinessNumber = null;
+    let bizNumClean = null;
+
+    if (businessType !== '개인') {
+      fullBusinessNumber = `${businessNumber1}-${businessNumber2}-${businessNumber3}`;
+      bizNumClean = fullBusinessNumber.replace(/-/g, '');
+    }
 
     // === Toss API ===
     let tossSellerId = null;
@@ -313,7 +292,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: existing[0] }, { status: 200 });
     } else {
       console.log('[API] GET - No business registration found');
-      return NextResponse.json({ data: null, message: 'No registration found' }, { status: 404 });
+      return NextResponse.json({ data: null, message: 'No registration found' }, { status: 200 });
     }
 
   } catch (error: any) {

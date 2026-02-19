@@ -46,3 +46,7 @@ local_env_backup.txt
 # debug scripts & temp env
 *.mjs
 temp_run.env
+test_toss_api.js
+
+# unused backup
+app_unused_backup_at_root/

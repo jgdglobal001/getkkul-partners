@@ -136,11 +136,11 @@ export const businessRegistrations = pgTable('business_registrations', {
   userId: text('userId').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
   businessType: text('businessType').notNull(),
   businessName: text('businessName').notNull(),
-  businessNumber: text('businessNumber').notNull().unique(),
+  businessNumber: text('businessNumber').unique(), // Nullable for individuals
   representativeName: text('representativeName').notNull(),
-  businessCategory: text('businessCategory').notNull(),
-  businessType2: text('businessType2').notNull(),
-  businessAddress: text('businessAddress').notNull(),
+  businessCategory: text('businessCategory'), // Nullable for individuals
+  businessType2: text('businessType2'), // Nullable for individuals
+  businessAddress: text('businessAddress'), // Nullable for individuals
   contactName: text('contactName').notNull(),
   contactPhone: text('contactPhone').notNull(),
   contactEmail: text('contactEmail').notNull(),
