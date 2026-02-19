@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { BANK_CODES } from '@/lib/constants';
 
-// Node.js runtime을 사용하여 안정성 확보 (Buffer 등 원활한 지원)
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
     console.log('[API] verify-account 시작');
