@@ -22,7 +22,7 @@ export default function SimpleSearchBar() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/categories');
+        const response = await fetch('/api/products/search?action=categories');
         const data = await response.json();
         if (data.success) {
           setCategories(data.data || []);

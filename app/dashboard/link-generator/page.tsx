@@ -59,7 +59,7 @@ function LinkGeneratorContent() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/categories');
+        const response = await fetch('/api/products/search?action=categories');
         const data = await response.json();
         if (data.success) {
           setCategories(data.data || []);
@@ -76,7 +76,7 @@ function LinkGeneratorContent() {
     const fetchCategoryProducts = async () => {
       setCategoryLoading(true);
       try {
-        const response = await fetch('/api/products/by-category?perCategory=6');
+        const response = await fetch('/api/products/search?action=by-category&perCategory=6');
         const data = await response.json();
         if (data.success) {
           setCategoryGroups(data.data || []);
