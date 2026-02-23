@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaSearch, FaSpinner } from 'react-icons/fa';
 import ProductCard from './ProductCard';
 import { toast } from 'react-hot-toast';
@@ -22,15 +22,40 @@ interface Product {
   availabilityStatus: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  parentId: string | null;
+}
+
 export default function SearchSection() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
+  // 카테고리 목록 로드
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        const data = await response.json();
+        if (data.success) {
+          setCategories(data.data || []);
+        }
+      } catch (error) {
+        console.error('카테고리 로드 오류:', error);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      toast.error('검색어를 입력해주세요.');
+    if (!searchQuery.trim() && !selectedCategory) {
+      toast.error('검색어를 입력하거나 카테고리를 선택해주세요.');
       return;
     }
 
@@ -38,7 +63,12 @@ export default function SearchSection() {
     setSearched(true);
 
     try {
-      const response = await fetch(`/api/products/search?q=${encodeURIComponent(searchQuery)}&limit=500`);
+      const params = new URLSearchParams();
+      if (searchQuery.trim()) params.set('q', searchQuery);
+      if (selectedCategory) params.set('category', selectedCategory);
+      params.set('limit', '500');
+
+      const response = await fetch(`/api/products/search?${params.toString()}`);
       const data = await response.json();
 
       if (data.success) {
@@ -123,6 +153,21 @@ export default function SearchSection() {
         <div className="max-w-3xl mx-auto mb-8">
           {/* 검색창 */}
           <div className="flex gap-2">
+            {/* 카테고리 드롭다운 */}
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-3 py-3 border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[140px] text-sm"
+              disabled={loading}
+            >
+              <option value="">전체 카테고리</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+
             <input
               type="text"
               value={searchQuery}
@@ -167,7 +212,7 @@ export default function SearchSection() {
             {/* 검색 결과 헤더 */}
             <div className="mb-6">
               <p className="text-lg font-semibold text-gray-700">
-                <span className="text-blue-600">&quot;{searchQuery}&quot;</span> 검색 결과{' '}
+                <span className="text-blue-600">&quot;{searchQuery || selectedCategory}&quot;</span> 검색 결과{' '}
                 <span className="text-blue-600">{products.length}개</span>
               </p>
             </div>

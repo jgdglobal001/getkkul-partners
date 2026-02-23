@@ -26,14 +26,39 @@ interface Product {
   availabilityStatus: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  parentId: string | null;
+}
+
 function SearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  // 카테고리 목록 로드
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        const data = await response.json();
+        if (data.success) {
+          setCategories(data.data || []);
+        }
+      } catch (error) {
+        console.error('카테고리 로드 오류:', error);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
@@ -43,20 +68,29 @@ function SearchContent() {
   }, [status, router]);
 
   useEffect(() => {
-    // URL 쿼리 파라미터에서 검색어 가져오기
+    // URL 쿼리 파라미터에서 검색어와 카테고리 가져오기
     const query = searchParams.get('q');
-    if (query) {
-      setSearchQuery(query);
-      performSearch(query);
+    const category = searchParams.get('category');
+    if (category) {
+      setSelectedCategory(category);
+    }
+    if (query || category) {
+      if (query) setSearchQuery(query);
+      performSearch(query || '', category || '');
     }
   }, [searchParams]);
 
-  const performSearch = async (query: string) => {
+  const performSearch = async (query: string, category?: string) => {
     setLoading(true);
     setSearched(true);
 
     try {
-      const response = await fetch(`/api/products/search?q=${encodeURIComponent(query)}&limit=500`);
+      const params = new URLSearchParams();
+      if (query) params.set('q', query);
+      if (category) params.set('category', category);
+      params.set('limit', '500');
+
+      const response = await fetch(`/api/products/search?${params.toString()}`);
       const data = await response.json();
 
       if (data.success) {
@@ -80,13 +114,16 @@ function SearchContent() {
   };
 
   const handleSearch = () => {
-    if (!searchQuery.trim()) {
-      toast.error('검색어를 입력해주세요.');
+    if (!searchQuery.trim() && !selectedCategory) {
+      toast.error('검색어를 입력하거나 카테고리를 선택해주세요.');
       return;
     }
 
     // URL 업데이트
-    router.push(`/products/search?q=${encodeURIComponent(searchQuery)}`);
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set('q', searchQuery);
+    if (selectedCategory) params.set('category', selectedCategory);
+    router.push(`/products/search?${params.toString()}`);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -185,6 +222,21 @@ function SearchContent() {
           <div className="max-w-3xl mx-auto mb-8">
             {/* 검색창 */}
             <div className="flex gap-2">
+              {/* 카테고리 드롭다운 */}
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-3 py-3 border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[140px] text-sm"
+                disabled={loading}
+              >
+                <option value="">전체 카테고리</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+
               <input
                 type="text"
                 value={searchQuery}
@@ -229,7 +281,7 @@ function SearchContent() {
               {/* 검색 결과 헤더 */}
               <div className="mb-6">
                 <p className="text-lg font-semibold text-gray-700">
-                  <span className="text-blue-600">&quot;{searchQuery}&quot;</span> 검색 결과{' '}
+                  <span className="text-blue-600">&quot;{searchQuery || selectedCategory}&quot;</span> 검색 결과{' '}
                   <span className="text-blue-600">{products.length}개</span>
                 </p>
               </div>

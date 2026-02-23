@@ -1,22 +1,55 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaSearch } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  parentId: string | null;
+}
+
 export default function SimpleSearchBar() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
   const router = useRouter();
 
+  // 카테고리 목록 로드
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        const data = await response.json();
+        if (data.success) {
+          setCategories(data.data || []);
+        }
+      } catch (error) {
+        console.error('카테고리 로드 오류:', error);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   const handleSearch = () => {
-    if (!searchQuery.trim()) {
-      toast.error('검색어를 입력해주세요.');
+    if (!searchQuery.trim() && !selectedCategory) {
+      toast.error('검색어를 입력하거나 카테고리를 선택해주세요.');
       return;
     }
 
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) {
+      params.set('q', searchQuery);
+    }
+    if (selectedCategory) {
+      params.set('category', selectedCategory);
+    }
+
     // /dashboard/link-generator 페이지로 이동
-    router.push(`/dashboard/link-generator?q=${encodeURIComponent(searchQuery)}`);
+    router.push(`/dashboard/link-generator?${params.toString()}`);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -34,6 +67,21 @@ export default function SimpleSearchBar() {
         {/* 검색 영역 */}
         <div className="max-w-3xl mx-auto">
           <div className="flex gap-2">
+            {/* 카테고리 드롭다운 */}
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-3 py-3 border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[140px] text-sm"
+            >
+              <option value="">전체 카테고리</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+
+            {/* 검색 입력창 */}
             <input
               type="text"
               value={searchQuery}

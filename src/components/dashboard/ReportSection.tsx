@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { getReportsData } from '@/actions/reports';
 
 interface ReportData {
   clicks: number;
@@ -35,10 +36,9 @@ export default function ReportSection() {
     const fetchReportData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/reports');
-        const result = await response.json();
+        const result = await getReportsData();
 
-        if (result.success && result.data) {
+        if (!result.error && result.data) {
           setDailyReport(result.data.daily);
           setMonthlyReport(result.data.monthly);
 
@@ -47,7 +47,7 @@ export default function ReportSection() {
           const formattedDate = `${updateTime.getFullYear()}.${String(updateTime.getMonth() + 1).padStart(2, '0')}.${String(updateTime.getDate()).padStart(2, '0')}`;
           setLastUpdate(formattedDate);
         } else {
-          // API 실패 시 기본 날짜 설정
+          // 실패 시 기본 날짜 설정
           const now = new Date();
           const formattedDate = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
           setLastUpdate(formattedDate);
