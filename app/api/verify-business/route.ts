@@ -248,6 +248,63 @@ async function handleVerifyAccount(request: NextRequest) {
     }
 
     const holderName = data.entityBody?.holderName;
+
+    // 계좌 인증 성공 후 → 이미 등록된 계좌인지 DB 확인
+    const userId = token.sub;
+    const accountClean = accountNumber.replace(/[^0-9]/g, '');
+    const existingAccount = await db
+      .select({
+        id: businessRegistrations.id,
+        userId: businessRegistrations.userId,
+        isCompleted: businessRegistrations.isCompleted,
+        step: businessRegistrations.step,
+        user: { email: users.email },
+        account: { provider: accounts.provider },
+      })
+      .from(businessRegistrations)
+      .leftJoin(users, eq(businessRegistrations.userId, users.id))
+      .leftJoin(accounts, eq(businessRegistrations.userId, accounts.userId))
+      .where(eq(businessRegistrations.accountNumber, accountNumber))
+      .limit(1);
+
+    // 하이픈 없는 버전으로도 검색
+    let existingResult = existingAccount[0];
+    if (!existingResult && accountClean !== accountNumber) {
+      const existingAccount2 = await db
+        .select({
+          id: businessRegistrations.id,
+          userId: businessRegistrations.userId,
+          isCompleted: businessRegistrations.isCompleted,
+          step: businessRegistrations.step,
+          user: { email: users.email },
+          account: { provider: accounts.provider },
+        })
+        .from(businessRegistrations)
+        .leftJoin(users, eq(businessRegistrations.userId, users.id))
+        .leftJoin(accounts, eq(businessRegistrations.userId, accounts.userId))
+        .where(eq(businessRegistrations.accountNumber, accountClean))
+        .limit(1);
+      existingResult = existingAccount2[0];
+    }
+
+    if (existingResult && existingResult.isCompleted && existingResult.step === 3 && existingResult.userId !== userId) {
+      const rawEmail = existingResult.user?.email || '';
+      let maskedEmail = '';
+      if (rawEmail) {
+        const [id, domain] = rawEmail.split('@');
+        maskedEmail = id.substring(0, 1) + '*'.repeat(Math.max(id.length - 1, 1)) + '@' + domain;
+      }
+      const providerMap: Record<string, string> = { 'google': '구글', 'naver': '네이버', 'kakao': '카카오' };
+      const providerName = providerMap[existingResult.account?.provider || ''] || existingResult.account?.provider || '소셜';
+      return NextResponse.json({
+        success: true,
+        holderName,
+        isAccountAlreadyRegistered: true,
+        message: '이 계좌는 이미 다른 파트너스 계정에 등록된 계좌입니다.',
+        existingAccount: { providerName, maskedEmail }
+      });
+    }
+
     return NextResponse.json({ success: true, holderName });
   } catch (error: any) {
     console.error('[API] 예외 발생:', error);

@@ -74,7 +74,76 @@ export async function POST(request: NextRequest) {
       bizNumClean = fullBusinessNumber.replace(/-/g, '');
     }
 
-    // === Toss API ===
+    // === 1단계: DB에 먼저 임시 저장 (토스 API 호출 전) ===
+    console.log('[API] Step 1: DB에 임시 저장 시작...');
+
+    // 사용자가 users 테이블에 존재하는지 확인 (signIn 콜백 실패 시 누락될 수 있음)
+    const existingUser = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!existingUser[0]) {
+      console.log('[API] User not found in DB. Creating user from JWT token...');
+      try {
+        await db.insert(users).values({
+          id: userId,
+          name: token.name || representativeName || '',
+          email: (token.email as string) || contactEmail || `unknown_${userId}@oauth.local`,
+          provider: 'oauth',
+          image: (token.picture as string) || '',
+          emailVerified: new Date(),
+        });
+        console.log('[API] User created successfully:', userId);
+      } catch (userCreateError: any) {
+        console.error('[API] Failed to create user:', userCreateError.message);
+        return NextResponse.json({
+          error: '사용자 계정 동기화에 실패했습니다. 로그아웃 후 다시 로그인해주세요.',
+          errorType: 'USER_SYNC_FAILED'
+        }, { status: 500 });
+      }
+    }
+
+    // 개인 사용자의 경우 빈 문자열을 null로 변환
+    const dbData = {
+      businessType: businessType || '법인',
+      businessName: businessName || representativeName,
+      businessNumber: fullBusinessNumber,
+      representativeName,
+      businessCategory: businessCategory || null,
+      businessType2: businessType2 || null,
+      businessAddress: businessAddress || null,
+      contactName, contactPhone, contactEmail,
+      bankName, accountNumber, accountHolder,
+      platformUrl: platformUrl || null,
+      mobileAppUrl: mobileAppUrl || null,
+      step: 3,
+      isCompleted: false,  // 토스 API 성공 전까지 미완료
+      sellerId: null,      // 토스 API 성공 후 업데이트
+      tossStatus: 'PENDING',
+    };
+
+    // 중복 등록 체크 + DB 임시 저장
+    const existing = await db.select().from(businessRegistrations).where(eq(businessRegistrations.userId, userId)).limit(1);
+
+    if (existing[0]) {
+      if (existing[0].isCompleted && existing[0].step === 3) {
+        return NextResponse.json({
+          error: '이미 등록된 계정입니다. 기존 계정으로 로그인해주세요.',
+          errorType: 'DUPLICATE_REGISTRATION'
+        }, { status: 409 });
+      }
+      // 미완료 등록이면 업데이트
+      await db.update(businessRegistrations).set({
+        ...dbData,
+        updatedAt: new Date(),
+      }).where(eq(businessRegistrations.userId, userId));
+      console.log('[API] DB 임시 업데이트 완료 (기존 레코드)');
+    } else {
+      await db.insert(businessRegistrations).values({
+        userId,
+        ...dbData,
+      });
+      console.log('[API] DB 임시 INSERT 완료 (신규 레코드)');
+    }
+
+    // === 2단계: 토스 API 호출 (DB 저장 성공 후에만 실행) ===
     let tossSellerId = null;
     let tossStatus = 'PENDING';
 
@@ -204,6 +273,12 @@ export async function POST(request: NextRequest) {
       if (!tossResponse.ok) {
         console.error('❌ Toss Error (Decrypted):', decryptedResponse);
 
+        // 토스 API 실패 시 DB에 실패 상태 기록 (임시 저장된 레코드 유지)
+        await db.update(businessRegistrations).set({
+          tossStatus: 'FAILED',
+          updatedAt: new Date(),
+        }).where(eq(businessRegistrations.userId, userId));
+
         const errDetail = decryptedResponse.error?.message || JSON.stringify(decryptedResponse);
 
         return NextResponse.json({
@@ -230,50 +305,14 @@ export async function POST(request: NextRequest) {
       console.warn('⚠️ No Toss Keys found. Skipping Toss API.');
     }
 
-    // === DB Update ===
-    console.log('[API] Updating DB...');
-
-    // 개인 사용자의 경우 빈 문자열을 null로 변환
-    const dbData = {
-      businessType: businessType || '법인',
-      businessName: businessName || representativeName, // 개인은 상호명 대신 이름 사용
-      businessNumber: fullBusinessNumber, // 개인은 null
-      representativeName,
-      businessCategory: businessCategory || null,
-      businessType2: businessType2 || null,
-      businessAddress: businessAddress || null,
-      contactName, contactPhone, contactEmail,
-      bankName, accountNumber, accountHolder,
-      platformUrl: platformUrl || null,
-      mobileAppUrl: mobileAppUrl || null,
-      step: 3,
-      isCompleted: true,
+    // === 3단계: 토스 API 결과를 DB에 반영 ===
+    console.log('[API] Step 3: DB에 토스 결과 반영...');
+    await db.update(businessRegistrations).set({
       sellerId: tossSellerId,
       tossStatus: tossStatus,
-    };
-
-    // 중복 등록 체크 — 기존 정산 기록 보호
-    const existing = await db.select().from(businessRegistrations).where(eq(businessRegistrations.userId, userId)).limit(1);
-
-    if (existing[0]) {
-      // 이미 완료된 등록이 있으면 409 Conflict
-      if (existing[0].isCompleted && existing[0].step === 3) {
-        return NextResponse.json({
-          error: '이미 등록된 계정입니다. 기존 계정으로 로그인해주세요.',
-          errorType: 'DUPLICATE_REGISTRATION'
-        }, { status: 409 });
-      }
-      // 미완료 등록이면 업데이트 허용
-      await db.update(businessRegistrations).set({
-        ...dbData,
-        updatedAt: new Date(),
-      }).where(eq(businessRegistrations.userId, userId));
-    } else {
-      await db.insert(businessRegistrations).values({
-        userId,
-        ...dbData,
-      });
-    }
+      isCompleted: true,
+      updatedAt: new Date(),
+    }).where(eq(businessRegistrations.userId, userId));
 
     console.log('[API] Success! Returning 200 OK.');
     return NextResponse.json({ success: true, sellerId: tossSellerId, status: tossStatus });

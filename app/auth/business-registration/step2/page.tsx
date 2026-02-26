@@ -200,6 +200,14 @@ export default function Step2Page() {
       }
 
       if (ok && result?.success) {
+        // 이미 등록된 계좌인지 확인
+        if (result.isAccountAlreadyRegistered) {
+          setIsAccountVerified(false);
+          const msg = `이 계좌는 이미 다른 파트너스 계정에 등록된 계좌입니다!\n\n기존 가입 계정: ${result.existingAccount?.providerName} (${result.existingAccount?.maskedEmail})\n\n다른 계좌를 사용하거나, 기존 계정으로 로그인해주세요.`;
+          alert(msg);
+          return;
+        }
+
         const actualHolder = result.holderName?.trim() || '';
         const inputHolder = formData.accountHolder.trim();
 
