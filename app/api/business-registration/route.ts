@@ -155,8 +155,15 @@ export async function POST(request: NextRequest) {
       if (!bankCode) return NextResponse.json({ error: `은행 코드를 찾을 수 없습니다: ${bankName}` }, { status: 400 });
 
       let tossBusinessType = 'CORPORATE';
-      if (businessType === '개인') tossBusinessType = 'INDIVIDUAL';
-      else if (businessType === '개인사업자') tossBusinessType = 'INDIVIDUAL_BUSINESS';
+      if (businessType === '개인') {
+        // SAFEGUARD: 사업자번호가 있으면 개인사업자로 보정
+        if (fullBusinessNumber) {
+          console.log('[API] SAFEGUARD: businessNumber exists but businessType is "개인". Correcting to INDIVIDUAL_BUSINESS');
+          tossBusinessType = 'INDIVIDUAL_BUSINESS';
+        } else {
+          tossBusinessType = 'INDIVIDUAL';
+        }
+      } else if (businessType === '개인사업자') tossBusinessType = 'INDIVIDUAL_BUSINESS';
       else tossBusinessType = 'CORPORATE';
 
       // refSellerId는 1~20자 제한이 있음
@@ -597,8 +604,15 @@ async function reRegisterSeller(registration: any, userId: string) {
   }
 
   let tossBusinessType = 'CORPORATE';
-  if (registration.businessType === '개인') tossBusinessType = 'INDIVIDUAL';
-  else if (registration.businessType === '개인사업자') tossBusinessType = 'INDIVIDUAL_BUSINESS';
+  if (registration.businessType === '개인') {
+    // SAFEGUARD: 사업자번호가 있으면 개인사업자로 보정
+    if (registration.businessNumber) {
+      console.log('[API] SAFEGUARD (reRegister): businessNumber exists but businessType is "개인". Correcting to INDIVIDUAL_BUSINESS');
+      tossBusinessType = 'INDIVIDUAL_BUSINESS';
+    } else {
+      tossBusinessType = 'INDIVIDUAL';
+    }
+  } else if (registration.businessType === '개인사업자') tossBusinessType = 'INDIVIDUAL_BUSINESS';
 
   const refSellerId = userId.slice(0, 20);
 
