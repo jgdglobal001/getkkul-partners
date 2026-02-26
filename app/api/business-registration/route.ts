@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       const payload: any = {
         refSellerId: refSellerId,
         businessType: tossBusinessType,
-        account: { bankCode, accountNumber, holderName: accountHolder }
+        account: { bankCode, accountNumber: accountNumber.replace(/[^0-9]/g, ''), holderName: accountHolder }
       };
 
       if (tossBusinessType === 'INDIVIDUAL') {
