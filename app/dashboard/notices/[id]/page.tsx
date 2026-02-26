@@ -1,9 +1,17 @@
-'use client';
-
-import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import Footer from '@/components/common/Footer';
+
+// 빌드 시 정적 생성할 ID 목록
+export function generateStaticParams() {
+  return [
+    { id: '161' },
+    { id: '160' },
+    { id: '158' },
+    { id: '149' },
+  ];
+}
 
 // 공지사항 상세 데이터 (실제로는 API에서 가져와야 함)
 const NOTICE_DETAILS: { [key: string]: any } = {
@@ -125,33 +133,13 @@ const NOTICE_DETAILS: { [key: string]: any } = {
   },
 };
 
-export default function NoticeDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const noticeId = params.id as string;
-  
+export default async function NoticeDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: noticeId } = await params;
+
   const notice = NOTICE_DETAILS[noticeId];
 
   if (!notice) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <DashboardHeader />
-        <main className="flex-1 py-8">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-              <p className="text-gray-500 mb-4">존재하지 않는 공지사항입니다.</p>
-              <Link
-                href="/dashboard/notices"
-                className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                목록으로 돌아가기
-              </Link>
-            </div>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
+    notFound();
   }
 
   return (
@@ -196,12 +184,12 @@ export default function NoticeDetailPage() {
 
           {/* 하단 버튼 */}
           <div className="mt-6 flex justify-center">
-            <button
-              onClick={() => router.back()}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+            <Link
+              href="/dashboard/notices"
+              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 inline-block"
             >
               목록으로
-            </button>
+            </Link>
           </div>
         </div>
       </main>
