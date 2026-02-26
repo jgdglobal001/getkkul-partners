@@ -1,4 +1,5 @@
-import { auth } from "@/auth";
+import { getToken } from "next-auth/jwt";
+import { cookies, headers } from "next/headers";
 
 export interface EdgeSession {
   user: {
@@ -12,23 +13,29 @@ export interface EdgeSession {
 
 /**
  * Edge Runtime에서 사용 가능한 세션 검증 함수
- * NextAuth v5의 auth() 함수를 사용
+ * getToken()을 사용하여 JWT만 검증 (auth() 대비 번들 크기 대폭 절감)
  */
-export async function getEdgeSession(): Promise<EdgeSession | null> {
+export async function getEdgeSession(request?: Request): Promise<EdgeSession | null> {
   try {
-    const session = await auth();
+    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
 
-    if (!session || !session.user) {
+    const token = await getToken({
+      req: request as any,
+      secret,
+      secureCookie: process.env.NODE_ENV === 'production',
+    });
+
+    if (!token?.sub) {
       return null;
     }
 
     return {
       user: {
-        id: session.user.id as string,
-        email: session.user.email as string,
-        name: session.user.name,
-        image: session.user.image,
-        role: session.user.role as string | undefined,
+        id: (token.id as string) || token.sub,
+        email: token.email as string,
+        name: token.name as string | null,
+        image: token.picture as string | null,
+        role: (token.role as string) || 'user',
       },
     };
   } catch (error) {

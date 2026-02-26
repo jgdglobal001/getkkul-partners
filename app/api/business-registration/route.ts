@@ -2,7 +2,7 @@ import { db } from '@/db';
 import { businessRegistrations, users, accounts } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import * as jose from 'jose';
+import { CompactEncrypt, compactDecrypt } from 'jose';
 import { getToken } from 'next-auth/jwt';
 
 export const runtime = 'edge';
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       // nonce: UUID와 같이 충분히 무작위적인 고유 값 (하이픈 유지)
       const nonce = crypto.randomUUID();
 
-      const encryptedBody = await new jose.CompactEncrypt(
+      const encryptedBody = await new CompactEncrypt(
         new TextEncoder().encode(JSON.stringify(payload))
       )
         .setProtectedHeader({
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
       try {
         // 성공 응답이든 에러 응답이든 암호화되어 오므로 복호화 시도
         if (encryptedResponseText.startsWith('ey')) { // JWE 형태인 경우
-          const { plaintext } = await jose.compactDecrypt(encryptedResponseText, key);
+          const { plaintext } = await compactDecrypt(encryptedResponseText, key);
           decryptedResponse = JSON.parse(new TextDecoder().decode(plaintext));
           console.log('[API] Decrypted Response:', JSON.stringify(decryptedResponse, null, 2));
         } else {
@@ -529,7 +529,7 @@ async function handleUpdateContact(request: NextRequest) {
     const iat = `${kstDate.getUTCFullYear()}-${pad(kstDate.getUTCMonth() + 1)}-${pad(kstDate.getUTCDate())}T${pad(kstDate.getUTCHours())}:${pad(kstDate.getUTCMinutes())}:${pad(kstDate.getUTCSeconds())}+09:00`;
     const nonce = crypto.randomUUID();
 
-    const encryptedBody = await new jose.CompactEncrypt(new TextEncoder().encode(JSON.stringify(payload)))
+    const encryptedBody = await new CompactEncrypt(new TextEncoder().encode(JSON.stringify(payload)))
       .setProtectedHeader({ alg: 'dir', enc: 'A256GCM', iat, nonce }).encrypt(key);
 
     const basicAuth = btoa(secretKey + ':');
@@ -543,7 +543,7 @@ async function handleUpdateContact(request: NextRequest) {
     let decryptedResponse;
     try {
       if (encryptedResponseText.startsWith('ey')) {
-        const { plaintext } = await jose.compactDecrypt(encryptedResponseText, key);
+        const { plaintext } = await compactDecrypt(encryptedResponseText, key);
         decryptedResponse = JSON.parse(new TextDecoder().decode(plaintext));
       } else {
         decryptedResponse = JSON.parse(encryptedResponseText);

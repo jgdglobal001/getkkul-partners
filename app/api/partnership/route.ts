@@ -17,7 +17,7 @@ function generatePartnershipId(): string {
 export async function GET(request: NextRequest) {
   try {
     // 세션 확인
-    const session = await getEdgeSession();
+    const session = await getEdgeSession(request);
 
     if (!session?.user?.id) {
       return NextResponse.json(

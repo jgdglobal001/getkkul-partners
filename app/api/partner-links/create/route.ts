@@ -10,7 +10,7 @@ export const runtime = 'edge';
 export async function POST(request: NextRequest) {
   try {
     // 인증 확인
-    const session = await getEdgeSession();
+    const session = await getEdgeSession(request);
 
     if (!session || !session.user) {
       return NextResponse.json(
