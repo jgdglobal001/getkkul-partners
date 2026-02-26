@@ -449,7 +449,10 @@ async function handleCheckStatus(request: NextRequest) {
     const registration = existing[0];
 
     if (!registration.sellerId) {
-      return NextResponse.json({ tossStatus: registration.tossStatus || 'PENDING', message: '토스페이먼츠 셀러 ID가 없습니다.', fromDB: true });
+      // sellerId가 없는 레거시 사용자 → 기존 DB 데이터로 재등록 시도
+      console.log('[API] No sellerId found. Attempting re-registration with existing DB data...');
+      const reRegResult = await reRegisterSeller(registration, userId);
+      return NextResponse.json(reRegResult);
     }
 
     const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY?.trim();
@@ -469,6 +472,12 @@ async function handleCheckStatus(request: NextRequest) {
     }
 
     if (!tossResponse.ok) {
+      // === 404인 경우: 이전 MID에서 등록된 셀러 → 현재 MID로 재등록 ===
+      if (tossResponse.status === 404) {
+        console.log('[API] Seller not found in TossPayments (404). Re-registering with existing DB data...');
+        const reRegResult = await reRegisterSeller(registration, userId);
+        return NextResponse.json(reRegResult);
+      }
       return NextResponse.json({ tossStatus: registration.tossStatus || 'PENDING', message: tossData.message || '토스 상태 조회 실패', fromDB: true });
     }
 
@@ -571,4 +580,124 @@ async function handleUpdateContact(request: NextRequest) {
     console.error('[API] Update contact error:', error);
     return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
   }
+}
+
+// ─── 기존 DB 데이터로 TossPayments 셀러 재등록 ───
+async function reRegisterSeller(registration: any, userId: string) {
+  const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY?.trim();
+  const securityKey = process.env.TOSS_PAYMENTS_SECURITY_KEY?.trim();
+
+  if (!secretKey || !securityKey) {
+    return { tossStatus: 'PENDING', message: '토스 API 키가 설정되지 않았습니다.', reRegistered: false };
+  }
+
+  const bankCode = BANK_CODES[registration.bankName];
+  if (!bankCode) {
+    return { tossStatus: 'PENDING', message: `은행 코드를 찾을 수 없습니다: ${registration.bankName}`, reRegistered: false };
+  }
+
+  let tossBusinessType = 'CORPORATE';
+  if (registration.businessType === '개인') tossBusinessType = 'INDIVIDUAL';
+  else if (registration.businessType === '개인사업자') tossBusinessType = 'INDIVIDUAL_BUSINESS';
+
+  const refSellerId = userId.slice(0, 20);
+
+  const payload: any = {
+    refSellerId,
+    businessType: tossBusinessType,
+    account: {
+      bankCode,
+      accountNumber: registration.accountNumber.replace(/[^0-9]/g, ''),
+      holderName: registration.accountHolder,
+    },
+  };
+
+  if (tossBusinessType === 'INDIVIDUAL') {
+    payload.individual = {
+      name: registration.representativeName,
+      email: registration.contactEmail,
+      phone: registration.contactPhone?.replace(/-/g, ''),
+    };
+  } else {
+    const bizNumClean = registration.businessNumber?.replace(/-/g, '') || '';
+    payload.company = {
+      businessRegistrationNumber: bizNumClean,
+      name: registration.businessName,
+      representativeName: registration.representativeName,
+      email: registration.contactEmail,
+      phone: registration.contactPhone?.replace(/-/g, ''),
+    };
+  }
+
+  // JWE 암호화
+  const key = new Uint8Array(securityKey.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16)));
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  const iat = `${kstDate.getUTCFullYear()}-${pad(kstDate.getUTCMonth() + 1)}-${pad(kstDate.getUTCDate())}T${pad(kstDate.getUTCHours())}:${pad(kstDate.getUTCMinutes())}:${pad(kstDate.getUTCSeconds())}+09:00`;
+  const nonce = crypto.randomUUID();
+
+  const encryptedBody = await new CompactEncrypt(
+    new TextEncoder().encode(JSON.stringify(payload))
+  ).setProtectedHeader({ alg: 'dir', enc: 'A256GCM', iat, nonce }).encrypt(key);
+
+  const basicAuth = btoa(secretKey + ':');
+
+  console.log('[API] Re-registering seller with TossPayments...');
+  console.log('[API] Payload businessType:', tossBusinessType, 'refSellerId:', refSellerId);
+
+  const tossResponse = await fetch('https://api.tosspayments.com/v2/sellers', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${basicAuth}`,
+      'Content-Type': 'text/plain',
+      'TossPayments-api-security-mode': 'ENCRYPTION',
+    },
+    body: encryptedBody,
+  });
+
+  const encryptedResponseText = await tossResponse.text();
+  let decryptedResponse;
+  try {
+    if (encryptedResponseText.startsWith('ey')) {
+      const { plaintext } = await compactDecrypt(encryptedResponseText, key);
+      decryptedResponse = JSON.parse(new TextDecoder().decode(plaintext));
+    } else {
+      decryptedResponse = JSON.parse(encryptedResponseText);
+    }
+  } catch {
+    decryptedResponse = { error: '복호화 실패', raw: encryptedResponseText };
+  }
+
+  if (!tossResponse.ok) {
+    console.error('[API] Re-registration failed:', decryptedResponse);
+    const errMsg = decryptedResponse?.error?.message || decryptedResponse?.entityBody?.message || JSON.stringify(decryptedResponse);
+    return { tossStatus: 'FAILED', message: `재등록 실패: ${errMsg}`, reRegistered: false, details: decryptedResponse };
+  }
+
+  console.log('[API] Re-registration success:', decryptedResponse);
+
+  const newSellerId = decryptedResponse.entityBody?.id || decryptedResponse.entityBody?.refSellerId || refSellerId;
+  let newStatus = 'COMPLETED';
+  if (decryptedResponse.entityBody?.status) newStatus = decryptedResponse.entityBody.status;
+  else if (decryptedResponse.status) newStatus = decryptedResponse.status;
+
+  // DB 업데이트: 새 sellerId와 tossStatus 저장
+  await db.update(businessRegistrations).set({
+    sellerId: newSellerId,
+    tossStatus: newStatus,
+    updatedAt: new Date(),
+  }).where(eq(businessRegistrations.userId, userId));
+
+  console.log('[API] DB updated with new sellerId:', newSellerId, 'tossStatus:', newStatus);
+
+  return {
+    tossStatus: newStatus,
+    sellerId: newSellerId,
+    businessType: registration.businessType,
+    contactPhone: registration.contactPhone,
+    contactEmail: registration.contactEmail,
+    reRegistered: true,
+    message: '토스페이먼츠에 재등록되었습니다. 카카오톡 인증을 확인해주세요.',
+  };
 }
