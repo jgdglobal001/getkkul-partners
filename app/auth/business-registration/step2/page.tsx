@@ -42,6 +42,8 @@ export default function Step2Page() {
     providerName: string;
     maskedEmail: string;
     provider: string;
+    businessType: string;
+    maskedBusinessName: string;
   } | null>(null);
 
   // 필수 항목 입력 여부 확인
@@ -279,6 +281,8 @@ export default function Step2Page() {
         providerName: result.existingAccount?.providerName || '소셜',
         maskedEmail: result.existingAccount?.maskedEmail || '',
         provider: result.existingAccount?.provider || '',
+        businessType: result.existingAccount?.businessType || '',
+        maskedBusinessName: result.existingAccount?.maskedBusinessName || '',
       });
     } else {
       alert(result?.message || error || '확인 중 오류가 발생했습니다.');
@@ -755,6 +759,14 @@ export default function Step2Page() {
             </div>
             <div className="bg-gray-50 rounded-lg p-4 mb-4 text-sm text-gray-700 space-y-2">
               <p>입력하신 이름과 휴대폰 번호로 이미 가입된 계정이 있습니다.</p>
+              {duplicateModal.businessType && (
+                <p className="font-bold text-gray-900">
+                  가입 유형: <span className="text-orange-600">{duplicateModal.businessType}</span>
+                  {duplicateModal.maskedBusinessName && (
+                    <span className="text-gray-500"> ({duplicateModal.maskedBusinessName})</span>
+                  )}
+                </p>
+              )}
               <p className="font-bold text-gray-900">
                 가입 경로: <span className="text-blue-600">{duplicateModal.providerName}</span>
                 {duplicateModal.maskedEmail && (

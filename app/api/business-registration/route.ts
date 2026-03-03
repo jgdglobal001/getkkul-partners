@@ -403,6 +403,8 @@ async function handleCheckDuplicate(request: NextRequest) {
       userId: businessRegistrations.userId,
       isCompleted: businessRegistrations.isCompleted,
       step: businessRegistrations.step,
+      businessType: businessRegistrations.businessType,
+      businessName: businessRegistrations.businessName,
       user: { email: users.email },
       account: { provider: accounts.provider },
     };
@@ -430,10 +432,26 @@ async function handleCheckDuplicate(request: NextRequest) {
       }
       const providerMap: Record<string, string> = { 'google': '구글', 'naver': '네이버', 'kakao': '카카오' };
       const providerName = providerMap[result.account?.provider || ''] || result.account?.provider || '소셜';
+
+      // 사업자명 마스킹 (개인사업자/법인일 때만)
+      let maskedBusinessName = '';
+      const rawBusinessName = result.businessName || '';
+      if (rawBusinessName && result.businessType !== '개인') {
+        if (rawBusinessName.length <= 2) {
+          maskedBusinessName = rawBusinessName[0] + '*';
+        } else {
+          const visibleLen = Math.ceil(rawBusinessName.length / 2);
+          maskedBusinessName = rawBusinessName.substring(0, visibleLen) + '*'.repeat(rawBusinessName.length - visibleLen);
+        }
+      }
+
+      const businessTypeMap: Record<string, string> = { '개인': '개인', '개인사업자': '개인사업자', '법인': '법인' };
+      const businessTypeLabel = businessTypeMap[result.businessType] || result.businessType || '';
+
       return NextResponse.json({
         success: false, isAlreadyRegistered: true,
         message: '이미 가입된 정보입니다. 기존 계정으로 로그인해주세요.',
-        existingAccount: { provider: result.account?.provider, providerName, maskedEmail }
+        existingAccount: { provider: result.account?.provider, providerName, maskedEmail, businessType: businessTypeLabel, maskedBusinessName }
       }, { status: 409 });
     }
 
