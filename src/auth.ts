@@ -53,34 +53,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           console.log(`[OAuth SignIn] Syncing user to DB: ${userEmail}`);
 
           try {
-            // 1. 기존 사용자 조회
+            // 기존 가입 완료 사용자 조회 (가입 완료 시에만 users 테이블에 저장됨)
             const existingUsers = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
-            let targetUser = existingUsers[0] || null;
-
-            // 2. 새 사용자 생성 (id를 명시적으로 생성 - $defaultFn은 Edge Runtime에서 불안정)
-            if (!targetUser) {
-              const newId = crypto.randomUUID();
-              console.log(`[OAuth SignIn] Creating user in DB with id: ${newId}`);
-              const newUsers = await db.insert(users).values({
-                id: newId,
-                name: user.name || (user.email ? "" : `${account.provider} User`),
-                email: userEmail,
-                image: user.image || "",
-                provider: account.provider,
-                updatedAt: new Date(),
-                emailVerified: user.email ? new Date() : null,
-              }).returning();
-              targetUser = newUsers[0];
-            }
+            const targetUser = existingUsers[0] || null;
 
             if (targetUser) {
               user.id = targetUser.id;
               if (!user.email) user.email = userEmail;
-              console.log(`[OAuth SignIn] DB Sync Success: ${targetUser.id}`);
+              console.log(`[OAuth SignIn] Existing user found: ${targetUser.id}`);
+            } else {
+              console.log(`[OAuth SignIn] New user (not yet registered): ${userEmail}`);
             }
           } catch (dbError: any) {
-            console.error("[OAuth SignIn] DB SYNC FAILURE:", dbError?.message);
-            console.error("[OAuth SignIn] Error code:", dbError?.code, "Detail:", dbError?.detail, "Constraint:", dbError?.constraint);
+            console.error("[OAuth SignIn] DB query error:", dbError?.message);
           }
 
           console.log(`[OAuth SignIn] Completed for: ${userEmail}`);
@@ -97,7 +82,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       else if (new URL(url).origin === baseUrl) return url;
       return baseUrl;
     },
-    async jwt({ token, user }: { token: any; user: any }) {
+    async jwt({ token, user, account }: { token: any; user: any; account?: any }) {
       if (user) {
         token.id = user.id || token.sub || `user_${Date.now()}`;
         token.role = "user";
@@ -105,6 +90,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.name = user.name;
         if (user.image) {
           token.picture = user.image;
+        }
+        if (account?.provider) {
+          token.provider = account.provider;
         }
       }
 

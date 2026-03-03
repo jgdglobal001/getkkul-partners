@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
           id: userId,
           name: token.name || representativeName || '',
           email: (token.email as string) || contactEmail || `unknown_${userId}@oauth.local`,
-          provider: 'oauth',
+          provider: (token.provider as string) || 'oauth',
           image: (token.picture as string) || '',
           updatedAt: new Date(),
           emailVerified: new Date(),
