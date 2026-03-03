@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
         console.log('[API] User created successfully:', userId);
       } catch (userCreateError: any) {
         console.error('[API] Failed to create user:', userCreateError.message);
+        console.error('[API] Error code:', userCreateError?.code, 'Detail:', userCreateError?.detail, 'Constraint:', userCreateError?.constraint);
         return NextResponse.json({
           error: '사용자 계정 동기화에 실패했습니다. 로그아웃 후 다시 로그인해주세요.',
           errorType: 'USER_SYNC_FAILED'

@@ -57,10 +57,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const existingUsers = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
             let targetUser = existingUsers[0] || null;
 
-            // 2. 새 사용자 생성
+            // 2. 새 사용자 생성 (id를 명시적으로 생성 - $defaultFn은 Edge Runtime에서 불안정)
             if (!targetUser) {
-              console.log(`[OAuth SignIn] Creating user in DB...`);
+              const newId = crypto.randomUUID();
+              console.log(`[OAuth SignIn] Creating user in DB with id: ${newId}`);
               const newUsers = await db.insert(users).values({
+                id: newId,
                 name: user.name || (user.email ? "" : `${account.provider} User`),
                 email: userEmail,
                 image: user.image || "",
@@ -75,8 +77,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               if (!user.email) user.email = userEmail;
               console.log(`[OAuth SignIn] DB Sync Success: ${targetUser.id}`);
             }
-          } catch (dbError) {
-            console.error("[OAuth SignIn] DB SYNC FAILURE:", dbError);
+          } catch (dbError: any) {
+            console.error("[OAuth SignIn] DB SYNC FAILURE:", dbError?.message);
+            console.error("[OAuth SignIn] Error code:", dbError?.code, "Detail:", dbError?.detail, "Constraint:", dbError?.constraint);
           }
 
           console.log(`[OAuth SignIn] Completed for: ${userEmail}`);
