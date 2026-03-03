@@ -67,6 +67,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 email: userEmail,
                 image: user.image || "",
                 provider: account.provider,
+                updatedAt: new Date(),
                 emailVerified: user.email ? new Date() : null,
               }).returning();
               targetUser = newUsers[0];

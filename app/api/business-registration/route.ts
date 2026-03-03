@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
           email: (token.email as string) || contactEmail || `unknown_${userId}@oauth.local`,
           provider: 'oauth',
           image: (token.picture as string) || '',
+          updatedAt: new Date(),
           emailVerified: new Date(),
         });
         console.log('[API] User created successfully:', userId);
