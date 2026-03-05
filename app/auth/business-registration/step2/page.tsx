@@ -212,10 +212,18 @@ export default function Step2Page() {
 
         const actualHolder = result.holderName?.trim() || '';
         const inputHolder = formData.accountHolder.trim();
+        // 공백 제거 후 비교 (토스 API가 예금주명을 글자수 제한으로 잘라서 반환할 수 있음)
+        const actualNorm = actualHolder.replace(/\s/g, '');
+        const inputNorm = inputHolder.replace(/\s/g, '');
 
         console.log(`Comparison: Actual Member Name[${actualHolder}] vs Input Name[${inputHolder}]`);
+        console.log(`Normalized: Actual[${actualNorm}] vs Input[${inputNorm}]`);
 
-        if (actualHolder === inputHolder) {
+        const isMatch = actualNorm === inputNorm
+          || inputNorm.startsWith(actualNorm)
+          || actualNorm.startsWith(inputNorm);
+
+        if (isMatch) {
           setIsAccountVerified(true);
           sessionStorage.setItem('isAccountVerified', 'true');
           alert(`✓ 계좌 인증 성공! (예금주: ${actualHolder})`);
