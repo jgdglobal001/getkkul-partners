@@ -43,10 +43,20 @@ next-env.d.ts
 # local backup
 local_env_backup.txt
 
-# debug scripts & temp env
-*.mjs
+# local-only maintenance scripts
+_check_db.mjs
+_db_check.mjs
+cleanup_production_db.mjs
+debug_db.mjs
+migrate_orders.mjs
+scripts/delete-yjs.mjs
+
+# temp env & debug helpers
+create_env.js
 temp_run.env
 test_toss_api.js
+test_toss_auth.js
+빌드 로그.txt
 
 # unused backup
 app_unused_backup_at_root/

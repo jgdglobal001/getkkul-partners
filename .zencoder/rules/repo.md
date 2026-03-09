@@ -6,18 +6,24 @@ alwaysApply: true
 # Getkkul Partners Information
 
 ## Summary
-Getkkul Partners is a partner sales platform for Getkkul Shopping, allowing users to sell top 1000 products and earn commissions, similar to Coupang Partners. It includes features for partner dashboard, product management, order management, and settlement management.
+Getkkul Partners is a Next.js App Router partner platform for Getkkul Shopping.
+The current codebase includes Auth.js/NextAuth v5 based social login, Drizzle + Neon
+database access, business-registration flows, Toss seller integration, and dashboard/admin pages.
 
 ## Structure
-- **app/**: Next.js App Router directory containing pages, API routes, and layout files
-- **src/**: Source code with components, hooks, contexts, types, and utilities
-- **prisma/**: Database schema and Prisma configuration for PostgreSQL
-- **public/**: Static assets including images and company introduction documents
+- **app/**: Next.js App Router pages, layouts, and route handlers
+- **src/auth.ts**: Auth.js configuration entry point
+- **src/db/**: Drizzle schema and runtime DB initialization
+- **src/lib/auth/**: edge-auth, OAuth provider helpers, user sync helpers
+- **src/lib/business-registration/**: store, duplicate-check, formatting helpers
+- **src/lib/toss/**: Toss seller helper utilities
+- **docs/**: Toss integration notes
+- **public/**: static assets and company introduction images
 
 ## Language & Runtime
 **Language**: TypeScript/JavaScript  
-**Version**: Node.js (required for Next.js), TypeScript 5.x  
-**Build System**: Next.js  
+**Runtime**: Node.js / Next.js / Cloudflare Pages  
+**Build System**: Next.js 16 + `@cloudflare/next-on-pages`  
 **Package Manager**: npm  
 
 ## Dependencies
@@ -25,19 +31,17 @@ Getkkul Partners is a partner sales platform for Getkkul Shopping, allowing user
 - next: 16.0.1  
 - react: 19.2.0  
 - react-dom: 19.2.0  
-- @prisma/client: ^6.19.0  
-- prisma: ^6.19.0  
-- next-auth: ^4.24.13  
-- axios: ^1.13.2  
-- framer-motion: ^12.23.24  
+- next-auth: ^5.0.0-beta.30  
+- @auth/drizzle-adapter: ^1.11.1  
+- drizzle-orm: ^0.45.1  
+- @neondatabase/serverless: ^1.0.2  
+- jose: ^6.1.3  
 - react-hot-toast: ^2.6.0  
 - react-icons: ^5.5.0  
 - zustand: ^5.0.8  
 
 **Development Dependencies**:  
-- @types/node: ^20  
-- @types/react: ^19  
-- @types/react-dom: ^19  
+- drizzle-kit: ^0.31.8  
 - eslint: ^9  
 - eslint-config-next: 16.0.1  
 - tailwindcss: ^4  
@@ -47,21 +51,20 @@ Getkkul Partners is a partner sales platform for Getkkul Shopping, allowing user
 ## Build & Installation
 ```bash
 npm install
-npm run build
-npm run start
-```
-
-Development server:  
-```bash
 npm run dev
+npm run build
+npm run build:pages
 ```
 
 ## Main Files & Resources
-**Entry Point**: app/page.tsx  
-**API Routes**: app/api/  
-**Database Schema**: prisma/schema.prisma  
-**Configuration**: next.config.ts, tsconfig.json  
-**Styling**: app/globals.css, Tailwind CSS  
+**App Entry**: `app/page.tsx`  
+**Auth Config**: `src/auth.ts`  
+**API Routes**: `app/api/`  
+**Database Schema**: `src/db/schema.ts`  
+**Configuration**: `next.config.mjs`, `wrangler.toml`, `tsconfig.json`  
+**Styling**: `app/globals.css`, Tailwind CSS  
 
-## Testing
-No testing framework or test files found in the repository.
+## Repository Notes
+- `README.md`, `package.json`, `wrangler.toml`, and actual code are the primary source of truth.
+- Several root-level `*_PROPOSAL.md`, `*_SUMMARY.md`, and `*_FINAL.md` files are historical notes and may not reflect the latest structure.
+- There is currently no dedicated automated test script in `package.json`.

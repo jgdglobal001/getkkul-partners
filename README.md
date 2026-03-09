@@ -1,90 +1,101 @@
-# 🚀 겟꿀 파트너스 (Getkkul Partners)
+# 겟꿀 파트너스
 
-겟꿀쇼핑의 파트너 판매 플랫폼입니다. 쿠팡 파트너스처럼 상위 1000개 상품을 판매하고 커미션을 획득할 수 있습니다.
+겟꿀 파트너 판매 플랫폼입니다. Next.js App Router 기반으로 구성되어 있고,
+인증(Auth.js/NextAuth v5), Drizzle + Neon DB, Toss/국세청 연동 라우트를 포함합니다.
 
-## 📋 프로젝트 구조
+## 현재 기준 문서
 
-```
-getkkul-partners/
-├── app/                          # Next.js App Router
-│   ├── layout.tsx               # 루트 레이아웃
-│   ├── page.tsx                 # 홈페이지
-│   ├── globals.css              # 전역 스타일
-│   └── api/                     # API 라우트
-├── src/
-│   ├── components/              # React 컴포넌트
-│   ├── lib/
-│   │   └── api-client.ts        # 겟꿀 메인 API 클라이언트
-│   ├── types/
-│   │   └── index.ts             # TypeScript 타입 정의
-│   ├── hooks/                   # 커스텀 훅
-│   ├── contexts/                # React Context
-│   └── utils/                   # 유틸리티 함수
-├── public/                      # 정적 자산
-├── .env.example                 # 환경 변수 예시
-├── package.json                 # 의존성
-└── tsconfig.json               # TypeScript 설정
-```
+이 저장소에서 **최신 기준**으로 봐야 할 것은 아래입니다.
 
-## 🎯 주요 기능
+- `README.md`
+- `package.json`
+- `wrangler.toml`
+- `next.config.mjs`
+- `src/`, `app/` 실제 코드
 
-### 1. 파트너 대시보드
-- 실시간 판매 현황
-- 수익 및 커미션 추적
-- 주문 관리
-- 정산 현황
+루트에 있는 `*_PROPOSAL.md`, `*_SUMMARY.md`, `*_FINAL.md` 문서는
+작업 기록/보조 문서일 수 있으므로 **현재 구조의 단일 진실 원천으로 간주하지 않습니다.**
 
-### 2. 상품 관리
-- 겟꿀 메인에서 상위 1000개 상품 조회
-- 상품 검색 및 필터링
-- 상품 상세 정보 확인
+## 주요 구조
 
-### 3. 주문 관리
-- 파트너의 판매 주문 조회
-- 주문 상태 추적
-- 배송 관리
-
-### 4. 정산 관리
-- 월별 정산 현황
-- 커미션 계산
-- 정산 내역 조회
-
-## 🛠️ 기술 스택
-
-- **프론트엔드**: Next.js 15, TypeScript, Tailwind CSS
-- **상태관리**: Zustand
-- **API 통신**: Axios
-- **UI 라이브러리**: React Icons, Framer Motion
-- **알림**: React Hot Toast
-
-## 🚀 시작하기
-
-### 1. 환경 설정
-
-```bash
-# .env 파일 생성
-cp .env.example .env
+```text
+app/                    Next.js App Router 페이지 및 API 라우트
+src/auth.ts             Auth.js(NextAuth v5) 설정
+src/db/                 Drizzle 스키마 및 DB 연결
+src/lib/auth/           Edge 세션/소셜 provider/user sync helper
+src/lib/business-registration/
+                        사업자 등록 관련 store/duplicate-check/format helper
+src/lib/toss/           Toss seller 연동 helper
+docs/                   Toss 연동 문서
+public/                 정적 자산
 ```
 
-필요한 환경 변수:
-```
-NEXT_PUBLIC_GETKKUL_API_URL=http://localhost:3002
-GETKKUL_API_SECRET=your-api-secret-key
-NEXTAUTH_URL=http://localhost:3003
-NEXTAUTH_SECRET=your-nextauth-secret-key
-PORT=3003
-```
+## 주요 기능
 
-### 2. 의존성 설치
+- 파트너 인증 및 소셜 로그인
+- 사업자 등록/중복 확인/상태 조회
+- Toss seller 등록 및 상태 연동
+- 상품 검색, 리포트, 파트너 링크 생성
+- 파트너 대시보드/공지/설정 화면
 
-```bash
-npm install
-```
+## 기술 스택
 
-### 3. 개발 서버 시작
+- Next.js 16.0.1 + React 19
+- TypeScript 5
+- Auth.js / NextAuth v5 beta
+- Drizzle ORM + Neon Serverless
+- Tailwind CSS 4
+- Cloudflare Pages + `@cloudflare/next-on-pages`
+
+## 실행 스크립트
 
 ```bash
 npm run dev
+npm run build
+npm run lint
+npm run build:pages
+npm run deploy
 ```
 
-브라우저에서 `http://localhost:3003` 접속
+- 개발 서버: `http://localhost:3003`
+- 배포 산출물 기준: `.vercel/output/static`
+
+## 주요 환경 변수
+
+최소한 아래 값들이 필요합니다.
+
+```bash
+DATABASE_URL=
+AUTH_SECRET=                # 또는 NEXTAUTH_SECRET
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+KAKAO_CLIENT_ID=
+KAKAO_CLIENT_SECRET=
+NAVER_CLIENT_ID=
+NAVER_CLIENT_SECRET=
+TOSS_PAYMENTS_SECRET_KEY=
+TOSS_PAYMENTS_SECURITY_KEY=
+NTS_BUSINESSMAN_API_KEY=
+```
+
+참고:
+
+- Auth는 `AUTH_SECRET` 또는 `NEXTAUTH_SECRET`를 사용합니다.
+- Google/Kakao/Naver provider는 `AUTH_*` 대체 키도 일부 호환합니다.
+- DB는 `DATABASE_URL` 없이는 초기화되지 않습니다.
+
+## 배포 메모
+
+- `wrangler.toml`의 `pages_build_output_dir`는 `.vercel/output/static`
+- 현재 Cloudflare Pages 빌드 경로를 사용합니다.
+- `@cloudflare/next-on-pages`는 deprecated 경고가 있으므로 추후 OpenNext 전환 검토가 필요합니다.
+
+## 검증 상태 메모
+
+현재 레포에는 별도 `test` 스크립트가 없습니다.
+그래서 안전 검증 기본값은 보통 아래 순서입니다.
+
+```bash
+npx tsc --noEmit
+npm run build
+```
