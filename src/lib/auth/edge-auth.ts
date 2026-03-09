@@ -7,6 +7,7 @@ export interface EdgeSession {
     name?: string | null;
     image?: string | null;
     role?: string;
+    provider?: string | null;
   };
 }
 
@@ -35,6 +36,7 @@ export async function getEdgeSession(request?: Request): Promise<EdgeSession | n
         name: token.name as string | null,
         image: token.picture as string | null,
         role: (token.role as string) || 'user',
+        provider: (token.provider as string) || null,
       },
     };
   } catch (error) {

@@ -1,16 +1,16 @@
-import { db } from '@/db';
-import { businessRegistrations, users, accounts } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { getEdgeSession } from '@/lib/auth/edge-auth';
+import { ensureOAuthUserRecord } from '@/lib/auth/user-sync';
+import { findCompletedDuplicateBusinessRegistration } from '@/lib/business-registration/duplicate-check';
 import {
-  formatPhoneForDuplicateSearch,
-  getBusinessTypeLabel,
-  getSocialProviderDisplayName,
-  maskBusinessName,
-  maskEmail,
-} from '@/lib/business-registration/format';
+  completeBusinessRegistration,
+  findBusinessRegistrationByUserId,
+  markBusinessRegistrationTossFailed,
+  savePendingBusinessRegistration,
+  updateBusinessRegistrationContact,
+  updateBusinessRegistrationSeller,
+  updateBusinessRegistrationTossStatus,
+} from '@/lib/business-registration/store';
 import {
   buildTossSellerPayload,
   encryptTossPayload,
@@ -35,36 +35,14 @@ export async function POST(request: NextRequest) {
   console.log('[API] Business Registration POST Request Received (JWT MODE)');
 
   try {
-    // 1. JWT 토큰을 직접 검증 (가벼운 방식, Edge 호환)
-    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-    if (!secret) {
-      console.error('[API] CRITICAL: AUTH_SECRET/NEXTAUTH_SECRET is missing in environment variables!');
-    } else {
-      console.log('[API] AUTH_SECRET is present (length: ' + secret.length + ')');
-    }
+    const session = await getEdgeSession(request);
 
-    // Inspect Cookies explicitly
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').map(c => c.trim().split('=')[0]);
-    console.log('[API] Cookies in Request:', cookies);
-
-    // Call getToken with secureCookie explicit setting if needed.
-    // Usually strict secure cookies are used in prod.
-    const token = await getToken({
-      req: request,
-      secret: secret,
-      secureCookie: process.env.NODE_ENV === 'production'
-    });
-
-    console.log('[API] getToken result:', token ? 'Token Found' : 'Token is NULL');
-
-    if (!token?.sub) {
+    if (!session?.user?.id) {
       console.log('[API] Token verification failed or no token found.');
-      console.log('[API] Full Headers:', JSON.stringify(Object.fromEntries(request.headers.entries())));
-      return NextResponse.json({ error: '인증되지 않은 사용자입니다. (No Token)' }, { status: 401 });
+      return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
     }
 
-    const userId = token.sub;
+    const userId = session.user.id;
     console.log('[API] Authenticated User:', userId);
 
     const body = await request.json();
@@ -91,29 +69,24 @@ export async function POST(request: NextRequest) {
     // === 1단계: DB에 먼저 임시 저장 (토스 API 호출 전) ===
     console.log('[API] Step 1: DB에 임시 저장 시작...');
 
-    // 사용자가 users 테이블에 존재하는지 확인 (signIn 콜백 실패 시 누락될 수 있음)
-    const existingUser = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-    if (!existingUser[0]) {
-      console.log('[API] User not found in DB. Creating user from JWT token...');
-      try {
-        await db.insert(users).values({
-          id: userId,
-          name: token.name || representativeName || '',
-          email: (token.email as string) || contactEmail || `unknown_${userId}@oauth.local`,
-          provider: (token.provider as string) || 'oauth',
-          image: (token.picture as string) || '',
-          updatedAt: new Date(),
-          emailVerified: new Date(),
-        });
-        console.log('[API] User created successfully:', userId);
-      } catch (userCreateError: any) {
-        console.error('[API] Failed to create user:', userCreateError.message);
-        console.error('[API] Error code:', userCreateError?.code, 'Detail:', userCreateError?.detail, 'Constraint:', userCreateError?.constraint);
-        return NextResponse.json({
-          error: '사용자 계정 동기화에 실패했습니다. 로그아웃 후 다시 로그인해주세요.',
-          errorType: 'USER_SYNC_FAILED'
-        }, { status: 500 });
-      }
+    try {
+      await ensureOAuthUserRecord({
+        userId,
+        email: session.user.email,
+        name: session.user.name,
+        image: session.user.image,
+        provider: session.user.provider,
+        fallbackEmail: contactEmail,
+        fallbackName: representativeName,
+      });
+      console.log('[API] User record ensured:', userId);
+    } catch (userCreateError: any) {
+      console.error('[API] Failed to create user:', userCreateError.message);
+      console.error('[API] Error code:', userCreateError?.code, 'Detail:', userCreateError?.detail, 'Constraint:', userCreateError?.constraint);
+      return NextResponse.json({
+        error: '사용자 계정 동기화에 실패했습니다. 로그아웃 후 다시 로그인해주세요.',
+        errorType: 'USER_SYNC_FAILED'
+      }, { status: 500 });
     }
 
     // 개인 사용자의 경우 빈 문자열을 null로 변환
@@ -136,26 +109,18 @@ export async function POST(request: NextRequest) {
     };
 
     // 중복 등록 체크 + DB 임시 저장
-    const existing = await db.select().from(businessRegistrations).where(eq(businessRegistrations.userId, userId)).limit(1);
+    const saveResult = await savePendingBusinessRegistration(userId, dbData);
 
-    if (existing[0]) {
-      if (existing[0].isCompleted && existing[0].step === 3) {
-        return NextResponse.json({
-          error: '이미 등록된 계정입니다. 기존 계정으로 로그인해주세요.',
-          errorType: 'DUPLICATE_REGISTRATION'
-        }, { status: 409 });
-      }
-      // 미완료 등록이면 업데이트
-      await db.update(businessRegistrations).set({
-        ...dbData,
-        updatedAt: new Date(),
-      }).where(eq(businessRegistrations.userId, userId));
+    if (saveResult === 'duplicate-completed') {
+      return NextResponse.json({
+        error: '이미 등록된 계정입니다. 기존 계정으로 로그인해주세요.',
+        errorType: 'DUPLICATE_REGISTRATION'
+      }, { status: 409 });
+    }
+
+    if (saveResult === 'updated') {
       console.log('[API] DB 임시 업데이트 완료 (기존 레코드)');
     } else {
-      await db.insert(businessRegistrations).values({
-        userId,
-        ...dbData,
-      });
       console.log('[API] DB 임시 INSERT 완료 (신규 레코드)');
     }
 
@@ -219,10 +184,7 @@ export async function POST(request: NextRequest) {
         console.error('❌ Toss Error (Decrypted):', decryptedResponse);
 
         // 토스 API 실패 시 DB에 실패 상태 기록 (임시 저장된 레코드 유지)
-        await db.update(businessRegistrations).set({
-          tossStatus: 'FAILED',
-          updatedAt: new Date(),
-        }).where(eq(businessRegistrations.userId, userId));
+        await markBusinessRegistrationTossFailed(userId);
 
         const errDetail = decryptedResponse.error?.message || decryptedResponse.message || JSON.stringify(decryptedResponse);
 
@@ -245,12 +207,7 @@ export async function POST(request: NextRequest) {
 
     // === 3단계: 토스 API 결과를 DB에 반영 ===
     console.log('[API] Step 3: DB에 토스 결과 반영...');
-    await db.update(businessRegistrations).set({
-      sellerId: tossSellerId,
-      tossStatus: tossStatus,
-      isCompleted: true,
-      updatedAt: new Date(),
-    }).where(eq(businessRegistrations.userId, userId));
+    await completeBusinessRegistration(userId, tossSellerId, tossStatus);
 
     console.log('[API] Success! Returning 200 OK.');
     return NextResponse.json({ success: true, sellerId: tossSellerId, status: tossStatus });
@@ -281,16 +238,12 @@ export async function GET(request: NextRequest) {
     console.log('[API] GET - Authenticated User:', userId);
 
     // DB에서 사용자의 비즈니스 등록 정보 조회
-    const existing = await db
-      .select()
-      .from(businessRegistrations)
-      .where(eq(businessRegistrations.userId, userId))
-      .limit(1);
+    const registration = await findBusinessRegistrationByUserId(userId);
 
-    if (existing[0]) {
+    if (registration) {
       console.log('[API] GET - Found business registration for user');
       // 프론트엔드에서 result.data로 접근하므로 { data: ... } 형식으로 반환
-      return NextResponse.json({ data: existing[0] }, { status: 200 });
+      return NextResponse.json({ data: registration }, { status: 200 });
     } else {
       console.log('[API] GET - No business registration found');
       return NextResponse.json({ data: null, message: 'No registration found' }, { status: 200 });
@@ -315,45 +268,16 @@ async function handleCheckDuplicate(request: NextRequest) {
     if (!representativeName || !contactPhone) {
       return NextResponse.json({ success: false, message: '이름과 휴대폰 번호를 모두 입력해주세요.' }, { status: 400 });
     }
-    const phoneFormatted = formatPhoneForDuplicateSearch(contactPhone);
+    const existingAccount = await findCompletedDuplicateBusinessRegistration({
+      representativeName,
+      contactPhone,
+    });
 
-    const selectFields = {
-      id: businessRegistrations.id,
-      userId: businessRegistrations.userId,
-      isCompleted: businessRegistrations.isCompleted,
-      step: businessRegistrations.step,
-      businessType: businessRegistrations.businessType,
-      businessName: businessRegistrations.businessName,
-      user: { email: users.email },
-      account: { provider: accounts.provider },
-    };
-
-    let result = (await db.select(selectFields).from(businessRegistrations)
-      .leftJoin(users, eq(businessRegistrations.userId, users.id))
-      .leftJoin(accounts, eq(businessRegistrations.userId, accounts.userId))
-      .where(and(eq(businessRegistrations.representativeName, representativeName), eq(businessRegistrations.contactPhone, phoneFormatted)))
-      .limit(1))[0];
-
-    if (!result && phoneFormatted !== contactPhone) {
-      result = (await db.select(selectFields).from(businessRegistrations)
-        .leftJoin(users, eq(businessRegistrations.userId, users.id))
-        .leftJoin(accounts, eq(businessRegistrations.userId, accounts.userId))
-        .where(and(eq(businessRegistrations.representativeName, representativeName), eq(businessRegistrations.contactPhone, contactPhone)))
-        .limit(1))[0];
-    }
-
-    if (result && result.isCompleted && result.step === 3) {
-      const maskedEmail = maskEmail(result.user?.email);
-      const providerName = getSocialProviderDisplayName(result.account?.provider);
-      const maskedBusinessName = result.businessType === '개인'
-        ? ''
-        : maskBusinessName(result.businessName);
-      const businessTypeLabel = getBusinessTypeLabel(result.businessType);
-
+    if (existingAccount) {
       return NextResponse.json({
         success: false, isAlreadyRegistered: true,
         message: '이미 가입된 정보입니다. 기존 계정으로 로그인해주세요.',
-        existingAccount: { provider: result.account?.provider, providerName, maskedEmail, businessType: businessTypeLabel, maskedBusinessName }
+        existingAccount,
       }, { status: 409 });
     }
 
@@ -372,9 +296,8 @@ async function handleCheckStatus(request: NextRequest) {
     if (!session?.user?.id) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
     const userId = session.user.id;
 
-    const existing = await db.select().from(businessRegistrations).where(eq(businessRegistrations.userId, userId)).limit(1);
-    if (!existing[0]) return NextResponse.json({ error: '등록된 사업자 정보가 없습니다.' }, { status: 404 });
-    const registration = existing[0];
+    const registration = await findBusinessRegistrationByUserId(userId);
+    if (!registration) return NextResponse.json({ error: '등록된 사업자 정보가 없습니다.' }, { status: 404 });
 
     if (!registration.sellerId) {
       // sellerId가 없는 레거시 사용자 → 기존 DB 데이터로 재등록 시도
@@ -411,7 +334,7 @@ async function handleCheckStatus(request: NextRequest) {
 
     const latestStatus = getTossSellerStatus(tossData, registration.tossStatus || 'PENDING');
     if (latestStatus && latestStatus !== registration.tossStatus) {
-      await db.update(businessRegistrations).set({ tossStatus: latestStatus, updatedAt: new Date() }).where(eq(businessRegistrations.userId, userId));
+      await updateBusinessRegistrationTossStatus(userId, latestStatus);
     }
 
     return NextResponse.json({
@@ -437,9 +360,8 @@ async function handleUpdateContact(request: NextRequest) {
     const { contactPhone, contactEmail } = body;
     if (!contactPhone && !contactEmail) return NextResponse.json({ error: '수정할 연락처 정보가 없습니다.' }, { status: 400 });
 
-    const existing = await db.select().from(businessRegistrations).where(eq(businessRegistrations.userId, userId)).limit(1);
-    if (!existing[0]) return NextResponse.json({ error: '등록된 사업자 정보가 없습니다.' }, { status: 404 });
-    const registration = existing[0];
+    const registration = await findBusinessRegistrationByUserId(userId);
+    if (!registration) return NextResponse.json({ error: '등록된 사업자 정보가 없습니다.' }, { status: 404 });
     if (!registration.sellerId) return NextResponse.json({ error: '토스페이먼츠 셀러 ID가 없습니다.' }, { status: 400 });
 
     const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY?.trim();
@@ -474,13 +396,12 @@ async function handleUpdateContact(request: NextRequest) {
       return NextResponse.json({ error: errMsg, details: decryptedResponse }, { status: tossResponse.status });
     }
 
-    const dbUpdate: any = { updatedAt: new Date() };
-    if (contactPhone) dbUpdate.contactPhone = contactPhone;
-    if (contactEmail) dbUpdate.contactEmail = contactEmail;
     const latestStatus = decryptedResponse?.entityBody?.status;
-    if (latestStatus) dbUpdate.tossStatus = latestStatus;
-
-    await db.update(businessRegistrations).set(dbUpdate).where(eq(businessRegistrations.userId, userId));
+    await updateBusinessRegistrationContact(userId, {
+      contactPhone,
+      contactEmail,
+      tossStatus: latestStatus,
+    });
 
     return NextResponse.json({
       success: true, tossStatus: latestStatus || registration.tossStatus,
@@ -554,11 +475,7 @@ async function reRegisterSeller(registration: any, userId: string) {
   const newStatus = getTossSellerStatus(decryptedResponse);
 
   // DB 업데이트: 새 sellerId와 tossStatus 저장
-  await db.update(businessRegistrations).set({
-    sellerId: newSellerId,
-    tossStatus: newStatus,
-    updatedAt: new Date(),
-  }).where(eq(businessRegistrations.userId, userId));
+  await updateBusinessRegistrationSeller(userId, newSellerId, newStatus);
 
   console.log('[API] DB updated with new sellerId:', newSellerId, 'tossStatus:', newStatus);
 

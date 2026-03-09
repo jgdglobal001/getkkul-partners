@@ -2,9 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Kakao from "@/lib/auth/providers/kakao";
 import Naver from "@/lib/auth/providers/naver";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { findUserByEmail } from "@/lib/auth/user-sync";
 
 // NextAuth v5 (Auth.js) 설정
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -53,9 +51,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           console.log(`[OAuth SignIn] Syncing user to DB: ${userEmail}`);
 
           try {
-            // 기존 가입 완료 사용자 조회 (가입 완료 시에만 users 테이블에 저장됨)
-            const existingUsers = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
-            const targetUser = existingUsers[0] || null;
+            const targetUser = await findUserByEmail(userEmail);
 
             if (targetUser) {
               user.id = targetUser.id;
