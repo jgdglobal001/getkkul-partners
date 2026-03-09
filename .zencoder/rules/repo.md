@@ -52,6 +52,8 @@ database access, business-registration flows, Toss seller integration, and dashb
 ```bash
 npm install
 npm run dev
+npm run verify:core
+npm run verify:deploy
 npm run build
 npm run build:pages
 ```
@@ -66,5 +68,7 @@ npm run build:pages
 
 ## Repository Notes
 - `README.md`, `package.json`, `wrangler.toml`, and actual code are the primary source of truth.
+- `docs/deployment-verification.md` documents the current Cloudflare deployment verification checklist.
 - Several root-level `*_PROPOSAL.md`, `*_SUMMARY.md`, and `*_FINAL.md` files are historical notes and may not reflect the latest structure.
-- There is currently no dedicated automated test script in `package.json`.
+- There is currently no dedicated `test` script, but `verify:core` and `verify:deploy` are the standard verification entry points.
+- Native Windows does not reliably run `@cloudflare/next-on-pages`; use `verify:core` locally and Cloudflare build logs (or WSL/Linux) for Pages adapter verification.

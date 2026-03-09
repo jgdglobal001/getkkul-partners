@@ -51,6 +51,8 @@ public/                 정적 자산
 
 ```bash
 npm run dev
+npm run verify:core
+npm run verify:deploy
 npm run build
 npm run lint
 npm run build:pages
@@ -89,13 +91,17 @@ NTS_BUSINESSMAN_API_KEY=
 - `wrangler.toml`의 `pages_build_output_dir`는 `.vercel/output/static`
 - 현재 Cloudflare Pages 빌드 경로를 사용합니다.
 - `@cloudflare/next-on-pages`는 deprecated 경고가 있으므로 추후 OpenNext 전환 검토가 필요합니다.
+- native Windows에서는 `@cloudflare/next-on-pages` 로컬 검증이 불안정하므로, `npm run verify:deploy`는 core 검증 후 Cloudflare 배포 로그 확인 절차를 안내합니다.
+- 자세한 기준은 `docs/deployment-verification.md`를 따릅니다.
 
 ## 검증 상태 메모
 
-현재 레포에는 별도 `test` 스크립트가 없습니다.
-그래서 안전 검증 기본값은 보통 아래 순서입니다.
+현재 레포에는 별도 `test` 스크립트는 없지만, 구조/배포 검증 기본값은 아래 순서입니다.
 
 ```bash
-npx tsc --noEmit
-npm run build
+npm run verify:core
+npm run verify:deploy
 ```
+
+- `verify:core`: 타입체크 + 핵심 lint + Next 프로덕션 빌드
+- `verify:deploy`: 로컬 사전 검증 + Cloudflare Pages 기준 배포 검증 절차 진입점
