@@ -9,6 +9,47 @@ import { getTossBasicAuthHeader } from '@/lib/toss/seller';
 
 export const runtime = 'edge';
 
+type VerifyBusinessRequestBody = {
+  businessNumber?: string;
+  businessName?: string;
+  representativeName?: string;
+  startDate?: string;
+};
+
+type NtsValidationResult = {
+  valid?: string;
+  valid_msg?: string;
+  request_param?: {
+    b_nm?: string;
+    p_nm?: string;
+  };
+  status?: {
+    b_stt?: string;
+  };
+};
+
+type NtsValidationResponse = {
+  status_code?: string;
+  data?: NtsValidationResult[];
+};
+
+type VerifyAccountRequestBody = {
+  bankName?: string;
+  accountNumber?: string;
+};
+
+type TossLookupHolderResponse = {
+  message?: string;
+  code?: string;
+  entityBody?: {
+    holderName?: string;
+  };
+};
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function POST(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
@@ -17,10 +58,10 @@ export async function POST(request: NextRequest) {
 
   try {
     console.log('📨 API 요청 수신');
-    let body;
+    let body: VerifyBusinessRequestBody;
     try {
       body = await request.json();
-    } catch (parseError) {
+    } catch (parseError: unknown) {
       console.error('❌ JSON 파싱 오류:', parseError);
       return NextResponse.json(
         { success: false, message: 'JSON 파싱 오류' },
@@ -99,11 +140,11 @@ export async function POST(request: NextRequest) {
 
     console.log('📥 국세청 응답 상태:', response.status);
 
-    let data;
+    let data: NtsValidationResponse;
     try {
-      data = await response.json();
+      data = (await response.json()) as NtsValidationResponse;
       console.log('📥 국세청 응답 데이터:', JSON.stringify(data, null, 2));
-    } catch (jsonError) {
+    } catch (jsonError: unknown) {
       console.error('❌ 국세청 응답 JSON 파싱 오류:', jsonError);
       return NextResponse.json(
         { success: false, message: '국세청 API 응답 처리 오류' },
@@ -168,8 +209,8 @@ export async function POST(request: NextRequest) {
           message: '사업자 정보가 확인되었습니다.',
           data: {
             businessNumber,
-            businessName: result.request_param.b_nm,
-            representativeName: result.request_param.p_nm,
+            businessName: result.request_param?.b_nm || businessName,
+            representativeName: result.request_param?.p_nm || representativeName,
             status: result.status?.b_stt || '계속사업자',
           },
         });
@@ -193,7 +234,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('사업자 정보 검증 오류:', error);
     return NextResponse.json(
       { success: false, message: '사업자 정보 검증 중 오류가 발생했습니다.' },
@@ -211,8 +252,12 @@ async function handleVerifyAccount(request: NextRequest) {
     const session = await getEdgeSession(request);
     if (!session?.user?.id) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
 
-    const body = await request.json();
+    const body = (await request.json()) as VerifyAccountRequestBody;
     const { bankName, accountNumber } = body;
+
+    if (!bankName || !accountNumber) {
+      return NextResponse.json({ error: '은행명과 계좌번호를 모두 입력해주세요.' }, { status: 400 });
+    }
 
     const bankCode = BANK_CODES[bankName];
     if (!bankCode) return NextResponse.json({ error: '지원되지 않는 은행입니다.' }, { status: 400 });
@@ -228,8 +273,8 @@ async function handleVerifyAccount(request: NextRequest) {
     });
 
     const text = await tossResponse.text();
-    let data;
-    try { data = JSON.parse(text); } catch {
+    let data: TossLookupHolderResponse;
+    try { data = JSON.parse(text) as TossLookupHolderResponse; } catch {
       return NextResponse.json({ error: '토스 서버에서 올바르지 않은 응답이 왔습니다.', raw: text }, { status: 502 });
     }
 
@@ -290,8 +335,8 @@ async function handleVerifyAccount(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, holderName });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] 예외 발생:', error);
-    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ error: `서버 내부 오류: ${getErrorMessage(error)}` }, { status: 500 });
   }
 }

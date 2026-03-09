@@ -8,6 +8,41 @@ import Image from 'next/image';
 import { BANK_NAMES } from '@/lib/constants';
 import { safeFetchJson } from '@/lib/safe-fetch';
 
+type VerifyBusinessResponse = {
+  success?: boolean;
+  message?: string;
+  isAlreadyRegistered?: boolean;
+  existingAccount?: {
+    providerName?: string;
+    maskedEmail?: string;
+  };
+};
+
+type VerifyAccountResponse = {
+  success?: boolean;
+  holderName?: string;
+  isAccountAlreadyRegistered?: boolean;
+  existingAccount?: {
+    providerName?: string;
+    maskedEmail?: string;
+  };
+  error?: string;
+  code?: string;
+};
+
+type DuplicateCheckResponse = {
+  success?: boolean;
+  message?: string;
+  isAlreadyRegistered?: boolean;
+  existingAccount?: {
+    providerName?: string;
+    maskedEmail?: string;
+    provider?: string;
+    businessType?: string;
+    maskedBusinessName?: string;
+  };
+};
+
 export default function Step2Page() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -141,7 +176,7 @@ export default function Step2Page() {
       const businessNumber = `${formData.businessNumber1}${formData.businessNumber2}${formData.businessNumber3}`;
       const startDate = formData.startDate.replace(/-/g, '');
 
-      const { ok, data: result, error } = await safeFetchJson('/api/verify-business', {
+      const { ok, data: result, error } = await safeFetchJson<VerifyBusinessResponse>('/api/verify-business', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -165,7 +200,7 @@ export default function Step2Page() {
           alert('✗ ' + (result?.message || error || '사업자 정보가 일치하지 않습니다.'));
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('사업자 정보 검증 오류:', error);
       alert('사업자 정보 검증 중 오류가 발생했습니다.');
       setIsBusinessVerified(false);
@@ -185,7 +220,7 @@ export default function Step2Page() {
 
     setAccountVerifyLoading(true);
     try {
-      const { ok, data: result, error, status, isHtmlResponse } = await safeFetchJson('/api/verify-business?action=verify-account', {
+      const { ok, data: result, error, status, isHtmlResponse } = await safeFetchJson<VerifyAccountResponse>('/api/verify-business?action=verify-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -237,7 +272,7 @@ export default function Step2Page() {
         const errorCode = result?.code ? `[${result.code}] ` : '';
         alert(`✗ ${errorCode}${errorMsg}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Network or Runtime Error during Verification:', error);
       alert('연결 중 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
     } finally {
@@ -270,7 +305,7 @@ export default function Step2Page() {
     }
 
     setDuplicateCheckLoading(true);
-    const { ok, data: result, error } = await safeFetchJson('/api/business-registration?action=check-duplicate', {
+    const { ok, data: result, error } = await safeFetchJson<DuplicateCheckResponse>('/api/business-registration?action=check-duplicate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -5,6 +5,32 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { safeFetchJson } from '@/lib/safe-fetch';
 
+type BusinessRegistrationStatusResponse = {
+  tossStatus?: string;
+  sellerId?: string;
+  businessType?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  message?: string;
+  fromDB?: boolean;
+};
+
+type BusinessRegistrationDataResponse = {
+  data?: {
+    businessName?: string | null;
+    businessType?: string | null;
+    contactPhone?: string | null;
+    tossStatus?: string | null;
+  } | null;
+  message?: string;
+};
+
+type UpdateContactResponse = {
+  success?: boolean;
+  tossStatus?: string;
+  message?: string;
+};
+
 export default function CompletePage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -23,7 +49,7 @@ export default function CompletePage() {
   // 토스 셀러 상태 확인
   const checkStatus = useCallback(async () => {
     setChecking(true);
-    const { ok, data } = await safeFetchJson('/api/business-registration?action=check-status');
+    const { ok, data } = await safeFetchJson<BusinessRegistrationStatusResponse>('/api/business-registration?action=check-status');
     if (ok && data?.tossStatus) {
       setTossStatus(data.tossStatus);
       if (data.contactPhone) setContactPhone(data.contactPhone);
@@ -40,7 +66,7 @@ export default function CompletePage() {
     if (sessionStatus !== 'authenticated') return;
 
     const fetchData = async () => {
-      const { ok, data: result } = await safeFetchJson('/api/business-registration');
+      const { ok, data: result } = await safeFetchJson<BusinessRegistrationDataResponse>('/api/business-registration');
       if (ok && result?.data) {
         setBusinessName(result.data.businessName || '');
         setBizType(result.data.businessType || '');
@@ -57,7 +83,7 @@ export default function CompletePage() {
     if (!newPhone.trim()) { alert('새 전화번호를 입력해주세요.'); return; }
     setUpdating(true);
     setUpdateMsg('');
-    const { ok, data, error } = await safeFetchJson('/api/business-registration?action=update-contact', {
+    const { ok, data, error } = await safeFetchJson<UpdateContactResponse>('/api/business-registration?action=update-contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contactPhone: newPhone }),

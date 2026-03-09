@@ -7,6 +7,23 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { safeFetchJson } from '@/lib/safe-fetch';
 
+type BusinessRegistrationSubmitResponse = {
+  success?: boolean;
+  sellerId?: string | null;
+  status?: string;
+  error?: string;
+  errorType?: string;
+  details?: {
+    tossStatus?: string | number;
+    tossMessage?: unknown;
+    sentPayload?: unknown;
+  };
+};
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export default function Step3Page() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -87,7 +104,7 @@ export default function Step3Page() {
       const { businessType: jongMok, ...restStep2 } = step2Data;
 
       // API에 데이터 전송
-      const { ok, data: responseData, status, error: fetchError, isHtmlResponse } = await safeFetchJson('/api/business-registration', {
+      const { ok, data: responseData, status, error: fetchError, isHtmlResponse } = await safeFetchJson<BusinessRegistrationSubmitResponse>('/api/business-registration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,7 +176,7 @@ export default function Step3Page() {
 
       // 완료 페이지로 이동
       router.push('/auth/business-registration/complete');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error:', error);
 
       // 실패 시 사업자 확인 상태 초기화
@@ -169,7 +186,7 @@ export default function Step3Page() {
         show: true,
         type: 'unknown',
         userMessage: '네트워크 오류가 발생했습니다.\n인터넷 연결을 확인한 후 다시 시도해주세요.',
-        debugInfo: error.message || String(error),
+        debugInfo: getErrorMessage(error),
       });
     }
   };

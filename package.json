@@ -8,6 +8,9 @@
     "build:pages": "npx @cloudflare/next-on-pages@1",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "lint:core": "eslint src/auth.ts src/types/next-auth.d.ts src/lib/auth/edge-auth.ts src/lib/auth/providers/kakao.ts src/lib/auth/providers/naver.ts src/lib/safe-fetch.ts src/db/index.ts app/api/business-registration/route.ts app/api/verify-business/route.ts app/auth/business-registration/step2/page.tsx app/auth/business-registration/step3/page.tsx app/auth/business-registration/complete/page.tsx app/dashboard/page.tsx",
+    "verify:core": "npm run typecheck && npm run lint:core && npm run build",
     "deploy": "npm run build:pages && npx wrangler pages deploy .vercel/output/static --project-name=getkkul-partners"
   },
   "dependencies": {

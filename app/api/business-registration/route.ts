@@ -3,6 +3,7 @@ import { getEdgeSession } from '@/lib/auth/edge-auth';
 import { ensureOAuthUserRecord } from '@/lib/auth/user-sync';
 import { findCompletedDuplicateBusinessRegistration } from '@/lib/business-registration/duplicate-check';
 import {
+  type BusinessRegistrationDraftInput,
   completeBusinessRegistration,
   findBusinessRegistrationByUserId,
   markBusinessRegistrationTossFailed,
@@ -25,6 +26,62 @@ export const runtime = 'edge';
 
 import { BANK_CODES } from '@/lib/constants';
 
+type BusinessRegistrationRequestBody = {
+  businessType?: string;
+  businessName?: string;
+  businessNumber1?: string;
+  businessNumber2?: string;
+  businessNumber3?: string;
+  representativeName?: string;
+  businessCategory?: string;
+  businessType2?: string;
+  businessAddress?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
+  platformUrl?: string;
+  mobileAppUrl?: string;
+};
+
+type DuplicateCheckRequestBody = {
+  representativeName?: string;
+  contactPhone?: string;
+};
+
+type UpdateContactRequestBody = {
+  contactPhone?: string;
+  contactEmail?: string;
+};
+
+type SellerContactPayload = {
+  individual?: {
+    phone?: string;
+    email?: string;
+  };
+  company?: {
+    phone?: string;
+    email?: string;
+  };
+};
+
+type BusinessRegistrationRecord = NonNullable<Awaited<ReturnType<typeof findBusinessRegistrationByUserId>>>;
+type TossStatusResponse = Parameters<typeof getTossSellerStatus>[0];
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getErrorMetadata(error: unknown) {
+  if (typeof error !== 'object' || error === null) {
+    return {} as { code?: unknown; detail?: unknown; constraint?: unknown };
+  }
+
+  return error as { code?: unknown; detail?: unknown; constraint?: unknown };
+}
+
 export async function POST(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
@@ -45,7 +102,7 @@ export async function POST(request: NextRequest) {
     const userId = session.user.id;
     console.log('[API] Authenticated User:', userId);
 
-    const body = await request.json();
+    const body = (await request.json()) as BusinessRegistrationRequestBody;
     console.log('[API] Body parsed successfully');
 
     // 2. 기존 로직 복구
@@ -56,9 +113,15 @@ export async function POST(request: NextRequest) {
       accountHolder, platformUrl, mobileAppUrl
     } = body;
 
+    if (!businessType || !representativeName || !contactName || !contactPhone || !contactEmail || !bankName || !accountNumber || !accountHolder) {
+      return NextResponse.json({ error: '필수 항목 누락' }, { status: 400 });
+    }
+
     if (businessType !== '개인' && (!businessName || !businessNumber1 || !businessNumber2 || !businessNumber3)) {
       return NextResponse.json({ error: '필수 항목 누락' }, { status: 400 });
     }
+
+    const resolvedBusinessName = businessName || representativeName;
 
     let fullBusinessNumber = null;
 
@@ -80,9 +143,11 @@ export async function POST(request: NextRequest) {
         fallbackName: representativeName,
       });
       console.log('[API] User record ensured:', userId);
-    } catch (userCreateError: any) {
-      console.error('[API] Failed to create user:', userCreateError.message);
-      console.error('[API] Error code:', userCreateError?.code, 'Detail:', userCreateError?.detail, 'Constraint:', userCreateError?.constraint);
+    } catch (userCreateError: unknown) {
+      const metadata = getErrorMetadata(userCreateError);
+
+      console.error('[API] Failed to create user:', getErrorMessage(userCreateError));
+      console.error('[API] Error code:', metadata.code, 'Detail:', metadata.detail, 'Constraint:', metadata.constraint);
       return NextResponse.json({
         error: '사용자 계정 동기화에 실패했습니다. 로그아웃 후 다시 로그인해주세요.',
         errorType: 'USER_SYNC_FAILED'
@@ -90,9 +155,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 개인 사용자의 경우 빈 문자열을 null로 변환
-    const dbData = {
+    const dbData: BusinessRegistrationDraftInput = {
       businessType: businessType || '법인',
-      businessName: businessName || representativeName,
+      businessName: resolvedBusinessName,
       businessNumber: fullBusinessNumber,
       representativeName,
       businessCategory: businessCategory || null,
@@ -146,7 +211,7 @@ export async function POST(request: NextRequest) {
         accountHolder,
         businessType,
         businessNumber: fullBusinessNumber,
-        businessName,
+        businessName: resolvedBusinessName,
         representativeName,
         contactEmail,
         contactPhone,
@@ -212,9 +277,9 @@ export async function POST(request: NextRequest) {
     console.log('[API] Success! Returning 200 OK.');
     return NextResponse.json({ success: true, sellerId: tossSellerId, status: tossStatus });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Critical Error:', error);
-    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ error: `서버 내부 오류: ${getErrorMessage(error)}` }, { status: 500 });
   }
 
 }
@@ -249,9 +314,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: null, message: 'No registration found' }, { status: 200 });
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] GET Error:', error);
-    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ error: `서버 내부 오류: ${getErrorMessage(error)}` }, { status: 500 });
   }
 }
 
@@ -260,7 +325,7 @@ export async function GET(request: NextRequest) {
 async function handleCheckDuplicate(request: NextRequest) {
   console.log('[API] Check Duplicate - Request Received');
   try {
-    let body;
+    let body: DuplicateCheckRequestBody;
     try { body = await request.json(); } catch {
       return NextResponse.json({ success: false, message: 'JSON 파싱 오류' }, { status: 400 });
     }
@@ -282,7 +347,7 @@ async function handleCheckDuplicate(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, message: '가입 가능합니다.' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Check Duplicate - 오류:', error);
     return NextResponse.json({ success: false, message: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
@@ -317,8 +382,8 @@ async function handleCheckStatus(request: NextRequest) {
     });
 
     const responseText = await tossResponse.text();
-    let tossData;
-    try { tossData = JSON.parse(responseText); } catch {
+    let tossData: TossStatusResponse;
+    try { tossData = JSON.parse(responseText) as TossStatusResponse; } catch {
       return NextResponse.json({ tossStatus: registration.tossStatus || 'PENDING', message: '토스 응답 파싱 실패', fromDB: true });
     }
 
@@ -342,9 +407,9 @@ async function handleCheckStatus(request: NextRequest) {
       sellerId: registration.sellerId, businessType: registration.businessType,
       contactPhone: registration.contactPhone, contactEmail: registration.contactEmail, fromDB: false,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Check status error:', error);
-    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ error: `서버 내부 오류: ${getErrorMessage(error)}` }, { status: 500 });
   }
 }
 
@@ -356,7 +421,7 @@ async function handleUpdateContact(request: NextRequest) {
     if (!session?.user?.id) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
     const userId = session.user.id;
 
-    const body = await request.json();
+    const body = (await request.json()) as UpdateContactRequestBody;
     const { contactPhone, contactEmail } = body;
     if (!contactPhone && !contactEmail) return NextResponse.json({ error: '수정할 연락처 정보가 없습니다.' }, { status: 400 });
 
@@ -369,7 +434,7 @@ async function handleUpdateContact(request: NextRequest) {
     if (!secretKey || !securityKey) return NextResponse.json({ error: '토스 API 키가 설정되지 않았습니다.' }, { status: 500 });
 
     const isIndividual = registration.businessType === '개인';
-    const payload: any = {};
+    const payload: SellerContactPayload = {};
     if (isIndividual) {
       payload.individual = {};
       if (contactPhone) payload.individual.phone = contactPhone.replace(/-/g, '');
@@ -407,14 +472,14 @@ async function handleUpdateContact(request: NextRequest) {
       success: true, tossStatus: latestStatus || registration.tossStatus,
       message: '연락처가 수정되었습니다. 토스페이먼츠에서 새 번호로 인증을 다시 진행합니다.',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Update contact error:', error);
-    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ error: `서버 내부 오류: ${getErrorMessage(error)}` }, { status: 500 });
   }
 }
 
 // ─── 기존 DB 데이터로 TossPayments 셀러 재등록 ───
-async function reRegisterSeller(registration: any, userId: string) {
+async function reRegisterSeller(registration: BusinessRegistrationRecord, userId: string) {
   const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY?.trim();
   const securityKey = process.env.TOSS_PAYMENTS_SECURITY_KEY?.trim();
 

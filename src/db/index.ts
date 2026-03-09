@@ -2,6 +2,8 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
 import * as schema from './schema';
 
+type Database = ReturnType<typeof drizzle>;
+
 // DB 접근 시점에 실제 DATABASE_URL을 확인하고 초기화
 function getDatabaseUrl(): string {
   // 런타임에 환경 변수를 가져옴
@@ -20,9 +22,9 @@ function getDatabaseUrl(): string {
 }
 
 // 런타임에 DATABASE_URL을 가져오도록 함수로 래핑
-let _db: ReturnType<typeof drizzle> | null = null;
+let _db: Database | null = null;
 
-export const db = new Proxy({} as ReturnType<typeof drizzle>, {
+export const db = new Proxy({} as Database, {
   get(_target, prop) {
     // 처음 접근 시 실제 DB 연결 생성
     if (!_db) {
@@ -38,7 +40,8 @@ export const db = new Proxy({} as ReturnType<typeof drizzle>, {
         throw error;
       }
     }
-    return (_db as any)[prop];
+
+    return Reflect.get(_db, prop);
   }
 });
 

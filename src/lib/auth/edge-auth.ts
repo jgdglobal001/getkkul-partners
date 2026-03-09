@@ -17,10 +17,14 @@ export interface EdgeSession {
  */
 export async function getEdgeSession(request?: Request): Promise<EdgeSession | null> {
   try {
+    if (!request) {
+      return null;
+    }
+
     const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
 
     const token = await getToken({
-      req: request as any,
+      req: request,
       secret,
       secureCookie: process.env.NODE_ENV === 'production',
     });
@@ -31,15 +35,15 @@ export async function getEdgeSession(request?: Request): Promise<EdgeSession | n
 
     return {
       user: {
-        id: (token.id as string) || token.sub,
-        email: token.email as string,
-        name: token.name as string | null,
-        image: token.picture as string | null,
-        role: (token.role as string) || 'user',
-        provider: (token.provider as string) || null,
+        id: token.id || token.sub,
+        email: token.email || '',
+        name: token.name ?? null,
+        image: token.picture ?? null,
+        role: token.role || 'user',
+        provider: token.provider || null,
       },
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Edge session verification error:', error);
     return null;
   }

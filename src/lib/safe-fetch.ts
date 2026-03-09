@@ -7,7 +7,30 @@
  * 해결: response를 text로 먼저 읽고, JSON 파싱을 안전하게 시도
  */
 
-export interface SafeFetchResult<T = any> {
+type SafeFetchErrorPayload = {
+  error?: unknown;
+  message?: unknown;
+};
+
+function getSafeFetchErrorMessage(data: unknown): string {
+  if (typeof data !== 'object' || data === null) {
+    return '요청 처리 중 오류가 발생했습니다.';
+  }
+
+  const payload = data as SafeFetchErrorPayload;
+
+  if (typeof payload.error === 'string') {
+    return payload.error;
+  }
+
+  if (typeof payload.message === 'string') {
+    return payload.message;
+  }
+
+  return '요청 처리 중 오류가 발생했습니다.';
+}
+
+export interface SafeFetchResult<T = unknown> {
   ok: boolean;
   status: number;
   data: T | null;
@@ -24,7 +47,7 @@ export interface SafeFetchResult<T = any> {
  * if (!ok) { console.error(error); return; }
  * // data를 안전하게 사용
  */
-export async function safeFetchJson<T = any>(
+export async function safeFetchJson<T = unknown>(
   url: string,
   options?: RequestInit
 ): Promise<SafeFetchResult<T>> {
@@ -49,7 +72,7 @@ export async function safeFetchJson<T = any>(
     // JSON 파싱 시도
     let data: T;
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(text) as T;
     } catch {
       console.error(`[safeFetchJson] JSON 파싱 실패 (${response.status}): ${url}`, text.slice(0, 200));
       return {
@@ -65,10 +88,10 @@ export async function safeFetchJson<T = any>(
       ok: response.ok,
       status: response.status,
       data,
-      error: response.ok ? null : ((data as any)?.error || (data as any)?.message || '요청 처리 중 오류가 발생했습니다.'),
+      error: response.ok ? null : getSafeFetchErrorMessage(data),
       isHtmlResponse: false,
     };
-  } catch (networkError: any) {
+  } catch (networkError: unknown) {
     console.error(`[safeFetchJson] 네트워크 오류: ${url}`, networkError);
     return {
       ok: false,

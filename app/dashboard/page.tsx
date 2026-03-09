@@ -11,6 +11,24 @@ import KycStatusBanner from '@/components/dashboard/KycStatusBanner';
 import Footer from '@/components/common/Footer';
 import { safeFetchJson } from '@/lib/safe-fetch';
 
+type BusinessRegistrationStatusResponse = {
+  tossStatus?: string;
+  sellerId?: string;
+  businessType?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  message?: string;
+  fromDB?: boolean;
+};
+
+type BusinessRegistrationDataResponse = {
+  data?: {
+    isCompleted?: boolean | null;
+    tossStatus?: string | null;
+  } | null;
+  message?: string;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -21,7 +39,7 @@ export default function DashboardPage() {
   // 토스 상태 수동 새로고침 (헤더/배너에서 호출)
   const refreshTossStatus = useCallback(async () => {
     setRefreshingStatus(true);
-    const { ok, data } = await safeFetchJson('/api/business-registration?action=check-status');
+    const { ok, data } = await safeFetchJson<BusinessRegistrationStatusResponse>('/api/business-registration?action=check-status');
     if (ok && data?.tossStatus) {
       setTossStatus(data.tossStatus);
       console.log('🔄 [Dashboard] 토스 상태 갱신:', data.tossStatus);
@@ -38,7 +56,7 @@ export default function DashboardPage() {
 
       if (status === 'authenticated' && session?.user?.id) {
         console.log('🔍 [Dashboard] 회사정보 확인 중...');
-        const { ok, data: result } = await safeFetchJson('/api/business-registration');
+        const { ok, data: result } = await safeFetchJson<BusinessRegistrationDataResponse>('/api/business-registration');
 
         if (!ok || !result?.data || !result.data.isCompleted) {
           console.log('⚠️ [Dashboard] 회사정보 없음 → step1으로 이동');
@@ -60,7 +78,7 @@ export default function DashboardPage() {
         // APPROVED가 아닌 경우 백그라운드로 토스 API 직접 조회하여 최신 상태 확인
         if (dbTossStatus && dbTossStatus !== 'APPROVED') {
           console.log('🔄 [Dashboard] 토스 최신 상태 백그라운드 확인 중...');
-          safeFetchJson('/api/business-registration?action=check-status')
+          safeFetchJson<BusinessRegistrationStatusResponse>('/api/business-registration?action=check-status')
             .then(({ ok, data }) => {
               if (ok && data?.tossStatus) {
                 setTossStatus(data.tossStatus);

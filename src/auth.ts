@@ -4,6 +4,24 @@ import Kakao from "@/lib/auth/providers/kakao";
 import Naver from "@/lib/auth/providers/naver";
 import { findUserByEmail } from "@/lib/auth/user-sync";
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getErrorMetadata(error: unknown) {
+  if (typeof error !== "object" || error === null) {
+    return {} as { code?: unknown; detail?: unknown; constraint?: unknown };
+  }
+
+  const metadata = error as {
+    code?: unknown;
+    detail?: unknown;
+    constraint?: unknown;
+  };
+
+  return metadata;
+}
+
 // NextAuth v5 (Auth.js) 설정
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Cloudflare Pages에서 호스트 신뢰 설정 필요
@@ -42,7 +60,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: "jwt",
   },
   callbacks: {
-    async signIn({ user, account }: { user: any; account?: any }) {
+    async signIn({ user, account }) {
       if (account?.provider === "google" || account?.provider === "kakao" || account?.provider === "naver") {
         try {
           console.log(`[OAuth SignIn] Provider: ${account?.provider}`);
@@ -60,25 +78,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             } else {
               console.log(`[OAuth SignIn] New user (not yet registered): ${userEmail}`);
             }
-          } catch (dbError: any) {
-            console.error("[OAuth SignIn] DB query error:", dbError?.message);
+          } catch (dbError: unknown) {
+            const metadata = getErrorMetadata(dbError);
+
+            console.error("[OAuth SignIn] DB query error:", getErrorMessage(dbError));
+            console.error("[OAuth SignIn] Error code:", metadata.code, "Detail:", metadata.detail, "Constraint:", metadata.constraint);
           }
 
           console.log(`[OAuth SignIn] Completed for: ${userEmail}`);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error("[OAuth SignIn] Fatal Error:", error);
         }
       }
       return true;
     },
-    async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
+    async redirect({ url, baseUrl }) {
       // Allows relative callback URLs
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       // Allows callback URLs on the same origin
       else if (new URL(url).origin === baseUrl) return url;
       return baseUrl;
     },
-    async jwt({ token, user, account }: { token: any; user: any; account?: any }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id || token.sub || `user_${Date.now()}`;
         token.role = "user";
@@ -106,15 +127,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       return token;
     },
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = (token.id as string) || (token.sub as string);
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
-        session.user.role = (token.role as string) || "user";
+        session.user.id = token.id || token.sub || "";
+        session.user.email = token.email || "";
+        session.user.name = token.name;
+        session.user.role = token.role || "user";
 
         if (token.picture) {
-          session.user.image = token.picture as string;
+          session.user.image = token.picture;
         }
       }
 
