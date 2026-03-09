@@ -2,8 +2,24 @@ import { db } from '@/db';
 import { businessRegistrations, users, accounts } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { CompactEncrypt, compactDecrypt } from 'jose';
 import { getToken } from 'next-auth/jwt';
+import { getEdgeSession } from '@/lib/auth/edge-auth';
+import {
+  formatPhoneForDuplicateSearch,
+  getBusinessTypeLabel,
+  getSocialProviderDisplayName,
+  maskBusinessName,
+  maskEmail,
+} from '@/lib/business-registration/format';
+import {
+  buildTossSellerPayload,
+  encryptTossPayload,
+  getMaskedTossPayloadForLog,
+  getTossBasicAuthHeader,
+  getTossSellerId,
+  getTossSellerStatus,
+  parseTossEncryptedResponse,
+} from '@/lib/toss/seller';
 
 export const runtime = 'edge';
 
@@ -67,11 +83,9 @@ export async function POST(request: NextRequest) {
     }
 
     let fullBusinessNumber = null;
-    let bizNumClean = null;
 
     if (businessType !== '개인') {
       fullBusinessNumber = `${businessNumber1}-${businessNumber2}-${businessNumber3}`;
-      bizNumClean = fullBusinessNumber.replace(/-/g, '');
     }
 
     // === 1단계: DB에 먼저 임시 저장 (토스 API 호출 전) ===
@@ -156,94 +170,29 @@ export async function POST(request: NextRequest) {
       const bankCode = BANK_CODES[bankName];
       if (!bankCode) return NextResponse.json({ error: `은행 코드를 찾을 수 없습니다: ${bankName}` }, { status: 400 });
 
-      let tossBusinessType = 'CORPORATE';
-      if (businessType === '개인') {
-        // SAFEGUARD: 사업자번호가 있으면 개인사업자로 보정
-        if (fullBusinessNumber) {
-          console.log('[API] SAFEGUARD: businessNumber exists but businessType is "개인". Correcting to INDIVIDUAL_BUSINESS');
-          tossBusinessType = 'INDIVIDUAL_BUSINESS';
-        } else {
-          tossBusinessType = 'INDIVIDUAL';
-        }
-      } else if (businessType === '개인사업자') tossBusinessType = 'INDIVIDUAL_BUSINESS';
-      else tossBusinessType = 'CORPORATE';
-
-      // refSellerId는 1~20자 제한이 있음
-      // userId(cuid)는 25자이므로 앞 20자만 사용
-      const refSellerId = userId.slice(0, 20);
-
-      const payload: any = {
-        refSellerId: refSellerId,
-        businessType: tossBusinessType,
-        account: { bankCode, accountNumber: accountNumber.replace(/[^0-9]/g, ''), holderName: accountHolder }
-      };
-
-      if (tossBusinessType === 'INDIVIDUAL') {
-        payload.individual = {
-          name: representativeName,
-          email: contactEmail,
-          phone: contactPhone?.replace(/-/g, '')
-        };
-      } else {
-        payload.company = {
-          businessRegistrationNumber: bizNumClean,
-          name: businessName,
-          representativeName: representativeName,
-          email: contactEmail,
-          phone: contactPhone?.replace(/-/g, '')
-        };
+      if (businessType === '개인' && fullBusinessNumber) {
+        console.log('[API] SAFEGUARD: businessNumber exists but businessType is "개인". Correcting to INDIVIDUAL_BUSINESS');
       }
 
-      // Encrypt with jose/TextEncoder (Edge Safe)
+      const payload = buildTossSellerPayload({
+        userId,
+        bankCode,
+        accountNumber,
+        accountHolder,
+        businessType,
+        businessNumber: fullBusinessNumber,
+        businessName,
+        representativeName,
+        contactEmail,
+        contactPhone,
+      });
+
       console.log('[API] Encrypting payload...');
-      const keyStr = securityKey as string;
-
-      // 가이드: "보안 키는 64자의 Hexadecimal 문자열입니다. 보안 키를 바이트로 전환해야 됩니다."
-      const key = new Uint8Array(
-        keyStr.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
-      );
-
-      // iat: yyyy-MM-dd'T'HH:mm:ss±hh:mm ISO 8601 형식
-      // Toss 공식 가이드 규격 준수: 밀리초(.SSS)를 포함하지 않아야 함
-      // 예: 2024-01-24T14:40:10+09:00
-      //
-      // 올바른 방법: 현재 시간을 KST 포맷으로 직접 생성
-      const now = new Date();
-      const pad = (n: number) => n.toString().padStart(2, '0');
-
-      // KST는 UTC+9이므로, 한국 시간으로 변환
-      const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-      const year = kstDate.getUTCFullYear();
-      const month = pad(kstDate.getUTCMonth() + 1);
-      const day = pad(kstDate.getUTCDate());
-      const hours = pad(kstDate.getUTCHours());
-      const minutes = pad(kstDate.getUTCMinutes());
-      const seconds = pad(kstDate.getUTCSeconds());
-
-      const iat = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+09:00`;
-      console.log('[API Debug] Generated iat:', iat);
-
-      // nonce: UUID와 같이 충분히 무작위적인 고유 값 (하이픈 유지)
-      const nonce = crypto.randomUUID();
-
-      const encryptedBody = await new CompactEncrypt(
-        new TextEncoder().encode(JSON.stringify(payload))
-      )
-        .setProtectedHeader({
-          alg: 'dir',
-          enc: 'A256GCM',
-          iat: iat,
-          nonce: nonce
-        })
-        .encrypt(key);
-
-      const basicAuth = btoa(secretKey + ':');
+      const { encryptedBody, key, iat, nonce } = await encryptTossPayload(payload, securityKey);
+      const basicAuth = getTossBasicAuthHeader(secretKey);
 
       // Log Payload (Masked)
-      const debugPayload = { ...payload };
-      if (debugPayload.account) {
-        debugPayload.account.accountNumber = '********';
-      }
+      const debugPayload = getMaskedTossPayloadForLog(payload);
       console.log('[API Debug] Payload to Toss:', JSON.stringify(debugPayload, null, 2));
       console.log('[API Debug] JWE Protected Header:', { alg: 'dir', enc: 'A256GCM', iat, nonce });
 
@@ -253,31 +202,18 @@ export async function POST(request: NextRequest) {
       const tossResponse = await fetch('https://api.tosspayments.com/v2/sellers', {
         method: 'POST',
         headers: {
-          'Authorization': `Basic ${basicAuth}`,
+          'Authorization': basicAuth,
           'Content-Type': 'text/plain', // 가이드: ENCRYPTION 모드일 때 필수
           'TossPayments-api-security-mode': 'ENCRYPTION' // 가이드와 동일한 대소문자
         },
         body: encryptedBody // 가이드: JWE 문자열 그 자체를 본문으로 전송
       });
 
-      // 응답 복호화 로직 추가
       const encryptedResponseText = await tossResponse.text();
       console.log('[API] Toss raw response received');
 
-      let decryptedResponse;
-      try {
-        // 성공 응답이든 에러 응답이든 암호화되어 오므로 복호화 시도
-        if (encryptedResponseText.startsWith('ey')) { // JWE 형태인 경우
-          const { plaintext } = await compactDecrypt(encryptedResponseText, key);
-          decryptedResponse = JSON.parse(new TextDecoder().decode(plaintext));
-          console.log('[API] Decrypted Response:', JSON.stringify(decryptedResponse, null, 2));
-        } else {
-          decryptedResponse = JSON.parse(encryptedResponseText);
-        }
-      } catch (decryptError) {
-        console.error('[API] Decryption failed or response is not JWE:', decryptError);
-        decryptedResponse = { error: '복호화 실패', raw: encryptedResponseText };
-      }
+      const decryptedResponse = await parseTossEncryptedResponse(encryptedResponseText, key);
+      console.log('[API] Decrypted Response:', JSON.stringify(decryptedResponse, null, 2));
 
       if (!tossResponse.ok) {
         console.error('❌ Toss Error (Decrypted):', decryptedResponse);
@@ -288,7 +224,7 @@ export async function POST(request: NextRequest) {
           updatedAt: new Date(),
         }).where(eq(businessRegistrations.userId, userId));
 
-        const errDetail = decryptedResponse.error?.message || JSON.stringify(decryptedResponse);
+        const errDetail = decryptedResponse.error?.message || decryptedResponse.message || JSON.stringify(decryptedResponse);
 
         return NextResponse.json({
           error: `Toss API Error: ${errDetail}`,
@@ -301,15 +237,8 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('✅ Toss Success:', decryptedResponse);
-      // Toss에서 반환하는 실제 sellerId 또는 refSellerId 저장
-      tossSellerId = decryptedResponse.entityBody?.id || decryptedResponse.entityBody?.refSellerId || refSellerId;
-      if (decryptedResponse.entityBody?.status) {
-        tossStatus = decryptedResponse.entityBody.status;
-      } else if (decryptedResponse.status) {
-        tossStatus = decryptedResponse.status;
-      } else {
-        tossStatus = 'COMPLETED';
-      }
+      tossSellerId = getTossSellerId(decryptedResponse, payload.refSellerId);
+      tossStatus = getTossSellerStatus(decryptedResponse);
     } else {
       console.warn('⚠️ No Toss Keys found. Skipping Toss API.');
     }
@@ -342,20 +271,13 @@ export async function GET(request: NextRequest) {
   console.log('[API] Business Registration GET Request Received');
 
   try {
-    // JWT 토큰 검증
-    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-    const token = await getToken({
-      req: request,
-      secret: secret,
-      secureCookie: process.env.NODE_ENV === 'production'
-    });
-
-    if (!token?.sub) {
+    const session = await getEdgeSession(request);
+    if (!session?.user?.id) {
       console.log('[API] GET - Token verification failed');
       return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
     }
 
-    const userId = token.sub;
+    const userId = session.user.id;
     console.log('[API] GET - Authenticated User:', userId);
 
     // DB에서 사용자의 비즈니스 등록 정보 조회
@@ -393,10 +315,7 @@ async function handleCheckDuplicate(request: NextRequest) {
     if (!representativeName || !contactPhone) {
       return NextResponse.json({ success: false, message: '이름과 휴대폰 번호를 모두 입력해주세요.' }, { status: 400 });
     }
-    const phoneClean = contactPhone.replace(/-/g, '');
-    const phoneFormatted = phoneClean.length === 11
-      ? `${phoneClean.slice(0, 3)}-${phoneClean.slice(3, 7)}-${phoneClean.slice(7)}`
-      : contactPhone;
+    const phoneFormatted = formatPhoneForDuplicateSearch(contactPhone);
 
     const selectFields = {
       id: businessRegistrations.id,
@@ -424,29 +343,12 @@ async function handleCheckDuplicate(request: NextRequest) {
     }
 
     if (result && result.isCompleted && result.step === 3) {
-      const rawEmail = result.user?.email || '';
-      let maskedEmail = '';
-      if (rawEmail) {
-        const [id, domain] = rawEmail.split('@');
-        maskedEmail = id.substring(0, 1) + '*'.repeat(Math.max(id.length - 1, 1)) + '@' + domain;
-      }
-      const providerMap: Record<string, string> = { 'google': '구글', 'naver': '네이버', 'kakao': '카카오' };
-      const providerName = providerMap[result.account?.provider || ''] || result.account?.provider || '소셜';
-
-      // 사업자명 마스킹 (개인사업자/법인일 때만)
-      let maskedBusinessName = '';
-      const rawBusinessName = result.businessName || '';
-      if (rawBusinessName && result.businessType !== '개인') {
-        if (rawBusinessName.length <= 2) {
-          maskedBusinessName = rawBusinessName[0] + '*';
-        } else {
-          const visibleLen = Math.ceil(rawBusinessName.length / 2);
-          maskedBusinessName = rawBusinessName.substring(0, visibleLen) + '*'.repeat(rawBusinessName.length - visibleLen);
-        }
-      }
-
-      const businessTypeMap: Record<string, string> = { '개인': '개인', '개인사업자': '개인사업자', '법인': '법인' };
-      const businessTypeLabel = businessTypeMap[result.businessType] || result.businessType || '';
+      const maskedEmail = maskEmail(result.user?.email);
+      const providerName = getSocialProviderDisplayName(result.account?.provider);
+      const maskedBusinessName = result.businessType === '개인'
+        ? ''
+        : maskBusinessName(result.businessName);
+      const businessTypeLabel = getBusinessTypeLabel(result.businessType);
 
       return NextResponse.json({
         success: false, isAlreadyRegistered: true,
@@ -466,10 +368,9 @@ async function handleCheckDuplicate(request: NextRequest) {
 async function handleCheckStatus(request: NextRequest) {
   console.log('[API] Check Toss Seller Status - Request Received');
   try {
-    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-    const token = await getToken({ req: request, secret, secureCookie: process.env.NODE_ENV === 'production' });
-    if (!token?.sub) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
-    const userId = token.sub;
+    const session = await getEdgeSession(request);
+    if (!session?.user?.id) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
+    const userId = session.user.id;
 
     const existing = await db.select().from(businessRegistrations).where(eq(businessRegistrations.userId, userId)).limit(1);
     if (!existing[0]) return NextResponse.json({ error: '등록된 사업자 정보가 없습니다.' }, { status: 404 });
@@ -487,9 +388,9 @@ async function handleCheckStatus(request: NextRequest) {
       return NextResponse.json({ tossStatus: registration.tossStatus || 'PENDING', message: '토스 API 키가 설정되지 않았습니다.', fromDB: true });
     }
 
-    const basicAuth = btoa(`${secretKey}:`);
+    const basicAuth = getTossBasicAuthHeader(secretKey);
     const tossResponse = await fetch(`https://api.tosspayments.com/v2/sellers/${registration.sellerId}`, {
-      method: 'GET', headers: { 'Authorization': `Basic ${basicAuth}` },
+      method: 'GET', headers: { 'Authorization': basicAuth },
     });
 
     const responseText = await tossResponse.text();
@@ -508,7 +409,7 @@ async function handleCheckStatus(request: NextRequest) {
       return NextResponse.json({ tossStatus: registration.tossStatus || 'PENDING', message: tossData.message || '토스 상태 조회 실패', fromDB: true });
     }
 
-    const latestStatus = tossData.entityBody?.status || tossData.status;
+    const latestStatus = getTossSellerStatus(tossData, registration.tossStatus || 'PENDING');
     if (latestStatus && latestStatus !== registration.tossStatus) {
       await db.update(businessRegistrations).set({ tossStatus: latestStatus, updatedAt: new Date() }).where(eq(businessRegistrations.userId, userId));
     }
@@ -528,10 +429,9 @@ async function handleCheckStatus(request: NextRequest) {
 async function handleUpdateContact(request: NextRequest) {
   console.log('[API] Update Contact - Request Received');
   try {
-    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-    const token = await getToken({ req: request, secret, secureCookie: process.env.NODE_ENV === 'production' });
-    if (!token?.sub) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
-    const userId = token.sub;
+    const session = await getEdgeSession(request);
+    if (!session?.user?.id) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
+    const userId = session.user.id;
 
     const body = await request.json();
     const { contactPhone, contactEmail } = body;
@@ -558,36 +458,19 @@ async function handleUpdateContact(request: NextRequest) {
       if (contactEmail) payload.company.email = contactEmail;
     }
 
-    const key = new Uint8Array(securityKey.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-    const now = new Date();
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-    const iat = `${kstDate.getUTCFullYear()}-${pad(kstDate.getUTCMonth() + 1)}-${pad(kstDate.getUTCDate())}T${pad(kstDate.getUTCHours())}:${pad(kstDate.getUTCMinutes())}:${pad(kstDate.getUTCSeconds())}+09:00`;
-    const nonce = crypto.randomUUID();
-
-    const encryptedBody = await new CompactEncrypt(new TextEncoder().encode(JSON.stringify(payload)))
-      .setProtectedHeader({ alg: 'dir', enc: 'A256GCM', iat, nonce }).encrypt(key);
-
-    const basicAuth = btoa(secretKey + ':');
+    const { encryptedBody, key } = await encryptTossPayload(payload, securityKey);
+    const basicAuth = getTossBasicAuthHeader(secretKey);
     const tossResponse = await fetch(`https://api.tosspayments.com/v2/sellers/${registration.sellerId}`, {
       method: 'POST',
-      headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'text/plain', 'TossPayments-api-security-mode': 'ENCRYPTION' },
+      headers: { 'Authorization': basicAuth, 'Content-Type': 'text/plain', 'TossPayments-api-security-mode': 'ENCRYPTION' },
       body: encryptedBody,
     });
 
     const encryptedResponseText = await tossResponse.text();
-    let decryptedResponse;
-    try {
-      if (encryptedResponseText.startsWith('ey')) {
-        const { plaintext } = await compactDecrypt(encryptedResponseText, key);
-        decryptedResponse = JSON.parse(new TextDecoder().decode(plaintext));
-      } else {
-        decryptedResponse = JSON.parse(encryptedResponseText);
-      }
-    } catch { decryptedResponse = { error: '복호화 실패', raw: encryptedResponseText }; }
+    const decryptedResponse = await parseTossEncryptedResponse(encryptedResponseText, key);
 
     if (!tossResponse.ok) {
-      const errMsg = decryptedResponse?.entityBody?.message || decryptedResponse?.message || '연락처 수정 실패';
+      const errMsg = decryptedResponse?.entityBody?.message || decryptedResponse?.error?.message || decryptedResponse?.message || '연락처 수정 실패';
       return NextResponse.json({ error: errMsg, details: decryptedResponse }, { status: tossResponse.status });
     }
 
@@ -623,67 +506,33 @@ async function reRegisterSeller(registration: any, userId: string) {
     return { tossStatus: 'PENDING', message: `은행 코드를 찾을 수 없습니다: ${registration.bankName}`, reRegistered: false };
   }
 
-  let tossBusinessType = 'CORPORATE';
-  if (registration.businessType === '개인') {
-    // SAFEGUARD: 사업자번호가 있으면 개인사업자로 보정
-    if (registration.businessNumber) {
-      console.log('[API] SAFEGUARD (reRegister): businessNumber exists but businessType is "개인". Correcting to INDIVIDUAL_BUSINESS');
-      tossBusinessType = 'INDIVIDUAL_BUSINESS';
-    } else {
-      tossBusinessType = 'INDIVIDUAL';
-    }
-  } else if (registration.businessType === '개인사업자') tossBusinessType = 'INDIVIDUAL_BUSINESS';
-
-  const refSellerId = userId.slice(0, 20);
-
-  const payload: any = {
-    refSellerId,
-    businessType: tossBusinessType,
-    account: {
-      bankCode,
-      accountNumber: registration.accountNumber.replace(/[^0-9]/g, ''),
-      holderName: registration.accountHolder,
-    },
-  };
-
-  if (tossBusinessType === 'INDIVIDUAL') {
-    payload.individual = {
-      name: registration.representativeName,
-      email: registration.contactEmail,
-      phone: registration.contactPhone?.replace(/-/g, ''),
-    };
-  } else {
-    const bizNumClean = registration.businessNumber?.replace(/-/g, '') || '';
-    payload.company = {
-      businessRegistrationNumber: bizNumClean,
-      name: registration.businessName,
-      representativeName: registration.representativeName,
-      email: registration.contactEmail,
-      phone: registration.contactPhone?.replace(/-/g, ''),
-    };
+  if (registration.businessType === '개인' && registration.businessNumber) {
+    console.log('[API] SAFEGUARD (reRegister): businessNumber exists but businessType is "개인". Correcting to INDIVIDUAL_BUSINESS');
   }
 
-  // JWE 암호화
-  const key = new Uint8Array(securityKey.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16)));
-  const now = new Date();
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-  const iat = `${kstDate.getUTCFullYear()}-${pad(kstDate.getUTCMonth() + 1)}-${pad(kstDate.getUTCDate())}T${pad(kstDate.getUTCHours())}:${pad(kstDate.getUTCMinutes())}:${pad(kstDate.getUTCSeconds())}+09:00`;
-  const nonce = crypto.randomUUID();
+  const payload = buildTossSellerPayload({
+    userId,
+    bankCode,
+    accountNumber: registration.accountNumber,
+    accountHolder: registration.accountHolder,
+    businessType: registration.businessType,
+    businessNumber: registration.businessNumber,
+    businessName: registration.businessName,
+    representativeName: registration.representativeName,
+    contactEmail: registration.contactEmail,
+    contactPhone: registration.contactPhone,
+  });
 
-  const encryptedBody = await new CompactEncrypt(
-    new TextEncoder().encode(JSON.stringify(payload))
-  ).setProtectedHeader({ alg: 'dir', enc: 'A256GCM', iat, nonce }).encrypt(key);
-
-  const basicAuth = btoa(secretKey + ':');
+  const { encryptedBody, key } = await encryptTossPayload(payload, securityKey);
+  const basicAuth = getTossBasicAuthHeader(secretKey);
 
   console.log('[API] Re-registering seller with TossPayments...');
-  console.log('[API] Payload businessType:', tossBusinessType, 'refSellerId:', refSellerId);
+  console.log('[API] Payload businessType:', payload.businessType, 'refSellerId:', payload.refSellerId);
 
   const tossResponse = await fetch('https://api.tosspayments.com/v2/sellers', {
     method: 'POST',
     headers: {
-      'Authorization': `Basic ${basicAuth}`,
+      'Authorization': basicAuth,
       'Content-Type': 'text/plain',
       'TossPayments-api-security-mode': 'ENCRYPTION',
     },
@@ -691,30 +540,18 @@ async function reRegisterSeller(registration: any, userId: string) {
   });
 
   const encryptedResponseText = await tossResponse.text();
-  let decryptedResponse;
-  try {
-    if (encryptedResponseText.startsWith('ey')) {
-      const { plaintext } = await compactDecrypt(encryptedResponseText, key);
-      decryptedResponse = JSON.parse(new TextDecoder().decode(plaintext));
-    } else {
-      decryptedResponse = JSON.parse(encryptedResponseText);
-    }
-  } catch {
-    decryptedResponse = { error: '복호화 실패', raw: encryptedResponseText };
-  }
+  const decryptedResponse = await parseTossEncryptedResponse(encryptedResponseText, key);
 
   if (!tossResponse.ok) {
     console.error('[API] Re-registration failed:', decryptedResponse);
-    const errMsg = decryptedResponse?.error?.message || decryptedResponse?.entityBody?.message || JSON.stringify(decryptedResponse);
+    const errMsg = decryptedResponse?.error?.message || decryptedResponse?.entityBody?.message || decryptedResponse?.message || JSON.stringify(decryptedResponse);
     return { tossStatus: 'FAILED', message: `재등록 실패: ${errMsg}`, reRegistered: false, details: decryptedResponse };
   }
 
   console.log('[API] Re-registration success:', decryptedResponse);
 
-  const newSellerId = decryptedResponse.entityBody?.id || decryptedResponse.entityBody?.refSellerId || refSellerId;
-  let newStatus = 'COMPLETED';
-  if (decryptedResponse.entityBody?.status) newStatus = decryptedResponse.entityBody.status;
-  else if (decryptedResponse.status) newStatus = decryptedResponse.status;
+  const newSellerId = getTossSellerId(decryptedResponse, payload.refSellerId);
+  const newStatus = getTossSellerStatus(decryptedResponse);
 
   // DB 업데이트: 새 sellerId와 tossStatus 저장
   await db.update(businessRegistrations).set({

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { businessRegistrations, users, accounts } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { getToken } from 'next-auth/jwt';
+import { getEdgeSession } from '@/lib/auth/edge-auth';
+import { getSocialProviderDisplayName, maskEmail } from '@/lib/business-registration/format';
 import { BANK_CODES } from '@/lib/constants';
+import { getTossBasicAuthHeader } from '@/lib/toss/seller';
 
 export const runtime = 'edge';
 
@@ -142,19 +144,8 @@ export async function POST(request: NextRequest) {
           console.log('❌ 이미 등록된 사업자번호:', formattedBusinessNumber);
 
           const reg = existingRegistration[0];
-          const rawEmail = reg.user?.email || '';
-          let maskedEmail = '';
-          if (rawEmail) {
-            const [id, domain] = rawEmail.split('@');
-            maskedEmail = id.substring(0, 1) + '*'.repeat(id.length - 1) + '@' + domain;
-          }
-
-          const providerMap: Record<string, string> = {
-            'google': '구글',
-            'naver': '네이버',
-            'kakao': '카카오'
-          };
-          const providerName = providerMap[reg.account?.provider || ''] || reg.account?.provider || '소셜';
+          const maskedEmail = maskEmail(reg.user?.email);
+          const providerName = getSocialProviderDisplayName(reg.account?.provider);
 
           return NextResponse.json(
             {
@@ -217,9 +208,8 @@ export async function POST(request: NextRequest) {
 async function handleVerifyAccount(request: NextRequest) {
   console.log('[API] verify-account 시작');
   try {
-    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-    const token = await getToken({ req: request, secret, secureCookie: process.env.NODE_ENV === 'production' });
-    if (!token?.sub) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
+    const session = await getEdgeSession(request);
+    if (!session?.user?.id) return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
 
     const body = await request.json();
     const { bankName, accountNumber } = body;
@@ -230,10 +220,10 @@ async function handleVerifyAccount(request: NextRequest) {
     const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY?.trim();
     if (!secretKey) return NextResponse.json({ error: '서버 설정 오류 (API Key missing)' }, { status: 500 });
 
-    const basicAuth = btoa(`${secretKey}:`);
+    const basicAuth = getTossBasicAuthHeader(secretKey);
     const tossResponse = await fetch('https://api.tosspayments.com/v2/bank-accounts/lookup-holder-name', {
       method: 'POST',
-      headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': basicAuth, 'Content-Type': 'application/json' },
       body: JSON.stringify({ bankCode, accountNumber }),
     });
 
@@ -250,7 +240,7 @@ async function handleVerifyAccount(request: NextRequest) {
     const holderName = data.entityBody?.holderName;
 
     // 계좌 인증 성공 후 → 이미 등록된 계좌인지 DB 확인
-    const userId = token.sub;
+    const userId = session.user.id;
     const accountClean = accountNumber.replace(/[^0-9]/g, '');
     const existingAccount = await db
       .select({
@@ -288,14 +278,8 @@ async function handleVerifyAccount(request: NextRequest) {
     }
 
     if (existingResult && existingResult.isCompleted && existingResult.step === 3 && existingResult.userId !== userId) {
-      const rawEmail = existingResult.user?.email || '';
-      let maskedEmail = '';
-      if (rawEmail) {
-        const [id, domain] = rawEmail.split('@');
-        maskedEmail = id.substring(0, 1) + '*'.repeat(Math.max(id.length - 1, 1)) + '@' + domain;
-      }
-      const providerMap: Record<string, string> = { 'google': '구글', 'naver': '네이버', 'kakao': '카카오' };
-      const providerName = providerMap[existingResult.account?.provider || ''] || existingResult.account?.provider || '소셜';
+      const maskedEmail = maskEmail(existingResult.user?.email);
+      const providerName = getSocialProviderDisplayName(existingResult.account?.provider);
       return NextResponse.json({
         success: true,
         holderName,

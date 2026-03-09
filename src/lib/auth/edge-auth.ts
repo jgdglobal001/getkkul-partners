@@ -1,5 +1,4 @@
 import { getToken } from "next-auth/jwt";
-import { cookies, headers } from "next/headers";
 
 export interface EdgeSession {
   user: {
